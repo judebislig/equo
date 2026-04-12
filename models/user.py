@@ -1,3 +1,4 @@
+# models/user.py
 from sqlalchemy import String, Float, DateTime
 from sqlalchemy.orm import Mapped, mapped_column
 from typing import Optional
@@ -9,7 +10,7 @@ class User(Base):
 
     # Primary key — auto increments
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    name: Mapped[str] = mapped_column(String)
+    name: Mapped[str] = mapped_column()
     age: Mapped[int] = mapped_column()
     
     # Physical stats — optional since user might not enter immediately
@@ -17,7 +18,7 @@ class User(Base):
     height: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     
     # Goal settings
-    goal: Mapped[str] = mapped_column(String)  # bulk, cut, maintain
-    calorie_target: Mapped[float] = mapped_column(Float)
+    goal: Mapped[str] = mapped_column()  # bulk, cut, maintain
+    calorie_target: Mapped[float] = mapped_column()
     
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
