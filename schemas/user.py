@@ -1,22 +1,30 @@
 # schemas/user.py
+# Pydantic models that define shape of API requests and responses for users
+# SQLAlchemy models (models/user.py) define the actual database table
+
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 
+# Shape of the incoming request body when creating a new user
 class UserCreate(BaseModel):
     name: str
     age: int
-    weight: Optional[float] = None
-    height: Optional[float] = None
-    goal: str   # bulk, cut, maintain
+    weight: Optional[float] = None  # optional — user can add later
+    height: Optional[float] = None  # optional — user can add later
+    goal: str                       # bulk, cut, maintain
     calorie_target: float
 
+
+# Shape of the incoming request body when updating an existing user
 class UserUpdate(BaseModel):
     weight: Optional[float] = None
     height: Optional[float] = None
     goal: Optional[str] = None
     calorie_target: Optional[float] = None
 
+
+# Shape of the outgoing response body when returning user data
 class UserResponse(BaseModel):
     id: int
     name: str
@@ -25,7 +33,7 @@ class UserResponse(BaseModel):
     height: Optional[float] = None
     goal: str
     calorie_target: float
-    created_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None   # set automatically by database on insert
 
     class Config:
-        from_attributes = True
+        from_attributes = True  # allows Pydantic to read SQLAlchemy model objects directly

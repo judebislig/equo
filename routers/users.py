@@ -1,4 +1,5 @@
 # routers/user.py
+# Defines all API endpoints related to users
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
