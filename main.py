@@ -3,8 +3,9 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 import os
 
-load_dotenv()
-DATABASE_URL = os.getenv("DATABASE_URL")
+from database import engine, Base
+
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
