@@ -1,13 +1,16 @@
-from sqlalchemy import create_engine, text
+# database.py
+# Handles all database connection setup
+
+from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
 import os
 
-# Load environment variables from .env file
 load_dotenv()
 
 # Get database connection string from environment
+# Set in .env as DATABASE_URL=postgresql://...
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 # Create the SQLAlchemy engine
