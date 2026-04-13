@@ -5,14 +5,15 @@
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
+from core.enums import GoalType
 
 # Shape of the incoming request body when creating a new user
 class UserCreate(BaseModel):
     name: str
     age: int
-    weight: Optional[float] = None  # optional — user can add later
-    height: Optional[float] = None  # optional — user can add later
-    goal: str                       # bulk, cut, maintain
+    weight: Optional[float] = None      # optional — user can add later
+    height: Optional[float] = None      # optional — user can add later
+    goal: GoalType = GoalType.maintain  # bulk, cut, maintain
     calorie_target: float
 
 
@@ -20,7 +21,7 @@ class UserCreate(BaseModel):
 class UserUpdate(BaseModel):
     weight: Optional[float] = None
     height: Optional[float] = None
-    goal: Optional[str] = None
+    goal: Optional[GoalType] = None
     calorie_target: Optional[float] = None
 
 
@@ -31,7 +32,7 @@ class UserResponse(BaseModel):
     age: int
     weight: Optional[float] = None
     height: Optional[float] = None
-    goal: str
+    goal: GoalType
     calorie_target: float
     created_at: Optional[datetime] = None   # set automatically by database on insert
 
