@@ -59,3 +59,17 @@ def update_user(user_id: int, user: UserUpdate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_user)
     return db_user
+
+
+# Delete a user given an id
+@router.delete("/{user_id}")
+def delete_user(user_id: int, db: Session = Depends(get_db)):
+    db_user = db.query(User).filter(User.id == user_id).first()
+
+    if not db_user:
+        raise HTTPException(status_code=404, detail=f"User {user_id} not found")
+    
+    db.delete(db_user)
+    db.commit()
+
+    return {"message": f"User {user_id} deleted successfully"}

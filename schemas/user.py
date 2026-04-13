@@ -1,5 +1,5 @@
 # schemas/user.py
-# Pydantic models that define shape of API requests and responses for users
+# Pydantic models that define shape of API requests and responses for users - turns data into Python object
 # SQLAlchemy models (models/user.py) define the actual database table
 
 from pydantic import BaseModel
