@@ -1,6 +1,6 @@
 # models/user.py
 # SQLAlchemy model that defines the users table in PostgreSQL
-# This is NOT a Pydantic schema — it maps directly to a database table
+# This is NOT a Pydantic schema - it maps directly to a database table
 
 from sqlalchemy import String, Float, DateTime
 from sqlalchemy.orm import Mapped, mapped_column

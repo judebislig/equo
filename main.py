@@ -5,6 +5,7 @@
 from fastapi import FastAPI
 from database import engine, Base
 from dotenv import load_dotenv
+from routers import users
 import models.user
 
 # Load environment variables from .env file
@@ -19,6 +20,8 @@ app = FastAPI(title="Equo")
 @app.get("/")
 def root():
     return {"Message": "Equo API is running"}
+
+app.include_router(users.router, prefix="/users", tags=["users"])
 
 
     
