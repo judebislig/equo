@@ -16,7 +16,7 @@ router = APIRouter()
 # Useful for previewing what Gemini + USDA will return before committing
 @router.post("/parse", response_model=dict)
 def preview_meal(description: str, db: Session = Depends(get_db)):
-    result = parse_meal(description, db)
+    result = parse_meal(description)
     return result
 
 
@@ -24,18 +24,19 @@ def preview_meal(description: str, db: Session = Depends(get_db)):
 # Calls Gemini to extract food items, looks up each in USDA database, sums macros, saves result linked to user
 @router.post("/", response_model=MealResponse)
 def log_meal(meal: MealCreate, db: Session = Depends(get_db)):
-    parsed = parse_meal(meal.description, db)
+    parsed = parse_meal(meal.description)
     
     # New SQLAlchemy Meal object from validated Python object (from Pydantic)
     db_meal = Meal(
         user_id=meal.user_id,
         meal_type=meal.meal_type,
         description=meal.description,
-        food_name=parsed["food_name"]
-        calories=parsed["calories"]
-        protein=parsed["protein"]
-        carbs=parsed["carbs"]
-        fat=parsed["fat"]
+        food_name=parsed["food_name"],
+        calories=parsed["calories"],
+        protein=parsed["protein"],
+        carbs=parsed["carbs"],
+        fat=parsed["fat"],
+        estimated=parsed["has_estimates"]   # store whether any item was estimated
     )
     db.add(db_meal)
     db.commit()
@@ -43,7 +44,7 @@ def log_meal(meal: MealCreate, db: Session = Depends(get_db)):
     return db_meal
 
 
-# Get all means logged by a user today
+# Get all meals logged by a user today
 # Filtered by user_id and today's date
 @router.get("/{user_id}/today", response_model=list[MealResponse])
 def get_todays_meals(user_id: int, db: Session = Depends(get_db)):
