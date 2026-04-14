@@ -5,7 +5,7 @@
 from fastapi import FastAPI
 from database import engine, Base
 from dotenv import load_dotenv
-from routers import users
+from routers import user
 import models.user
 import models.meal
 
@@ -22,7 +22,7 @@ app = FastAPI(title="Equo")
 def root():
     return {"Message": "Equo API is running"}
 
-app.include_router(users.router, prefix="/users", tags=["users"])
+app.include_router(user.router, prefix="/users", tags=["users"])
 
 
     

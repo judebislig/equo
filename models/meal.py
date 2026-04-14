@@ -7,14 +7,15 @@ from sqlalchemy.orm import Mapped, mapped_column
 from typing import Optional
 from datetime import datetime
 from database import Base
+from core.enums import MealType
 
 class User(Base):
     __tablename__ = "meals"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
-    meal_type: Mapped[str] = mapped_column()    # breakfast, lunch, dinner, snack
-    description: Mapped[str] = mapped_column()  # natural language input
+    meal_type: Mapped[MealType] = mapped_column()   # breakfast, lunch, dinner, snack
+    description: Mapped[str] = mapped_column()      # natural language input
 
     # Returned and parsed from LLM (Gemini Flash)
     food_name: Mapped[str] = mapped_column()
@@ -23,4 +24,4 @@ class User(Base):
     carbs: Mapped[float] = mapped_column()
     fat: Mapped[float] = mapped_column()
 
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    logged_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)

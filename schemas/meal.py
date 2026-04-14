@@ -5,31 +5,27 @@
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
+from core.enums import MealType
 
 # Shape of the incoming request body when creating a new meal
 class MealCreate(BaseModel):
     user_id: int
-    meal_type: str
+    meal_type: MealType
     description: str
-
-
-# Shape of the incoming request body when updating an existing meal
-class MealUpdate(BaseModel):
-    weight: Optional[float] = None
-    height: Optional[float] = None
-    goal: Optional[GoalType] = None
-    calorie_target: Optional[float] = None
 
 
 # Shape of the outgoing response body when returning meal data
 class MealResponse(BaseModel):
     id: int
-    name: str
-    age: int
-    weight: Optional[float] = None
-    height: Optional[float] = None
-    calorie_target: float
-    created_at: Optional[datetime] = None   # set automatically by database on insert
+    user_id: int
+    meal_type: MealType
+    description: str    # original imput
+    food_name: str      # Gemini parsed
+    calories: float     # Gemini estimated
+    protein: float      # Gemini estimated
+    carbs: float        # Gemini estimated
+    fat: float          # Gemini estimated
+    logged_at: Optional[datetime] = None  
 
     class Config:
         from_attributes = True  # allows Pydantic to read SQLAlchemy model objects directly
