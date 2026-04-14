@@ -13,7 +13,7 @@ class UserCreate(BaseModel):
     age: int
     weight: Optional[float] = None      # optional — user can add later
     height: Optional[float] = None      # optional — user can add later
-    goal: GoalType = GoalType.maintain  # bulk, cut, maintain
+    goal: GoalType = GoalType.maintain  # bulk, cut, maintain. Default is maintain for now
     calorie_target: float
 
 

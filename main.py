@@ -7,6 +7,7 @@ from database import engine, Base
 from dotenv import load_dotenv
 from routers import users
 import models.user
+import models.meal
 
 # Load environment variables from .env file
 # Makes DATABASE_URL, ANTHROPIC_API_KEY, etc available to all modules

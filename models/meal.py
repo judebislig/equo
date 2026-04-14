@@ -1,21 +1,26 @@
-# models/user.py
+# models/meal.py
 # SQLAlchemy model that defines the users table in PostgreSQL - turns Python object into SQLAlchemy object that can be translated to database (ORM)
 # This is NOT a Pydantic schema - it maps directly to a database table
 
+from sqlalchemy import ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 from typing import Optional
 from datetime import datetime
 from database import Base
-from core.enums import GoalType
 
 class User(Base):
-    __tablename__ = "users"
+    __tablename__ = "meals"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    name: Mapped[str] = mapped_column()
-    age: Mapped[int] = mapped_column()
-    weight: Mapped[Optional[float]] = mapped_column(nullable=True)
-    height: Mapped[Optional[float]] = mapped_column(nullable=True)
-    goal: Mapped[GoalType] = mapped_column()  # bulk, cut, maintain. Maintain is default for now
-    calorie_target: Mapped[float] = mapped_column()
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    meal_type: Mapped[str] = mapped_column()
+    description: Mapped[str] = mapped_column()
+
+    # Returned and parsed from LLM (Gemini Flash)
+    food_name: Mapped[str] = mapped_column()
+    calories: Mapped[float] = mapped_column()
+    protein: Mapped[float] = mapped_column()
+    carbs: Mapped[float] = mapped_column()
+    fat: Mapped[float] = mapped_column()
+
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
