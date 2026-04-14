@@ -62,7 +62,7 @@ def update_user(user_id: int, user: UserUpdate, db: Session = Depends(get_db)):
 
 
 # Delete a user given an id
-@router.delete("/{user_id}")
+@router.delete("/{user_id}", response_model=dict)
 def delete_user(user_id: int, db: Session = Depends(get_db)):
     db_user = db.query(User).filter(User.id == user_id).first()
 
