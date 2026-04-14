@@ -13,8 +13,8 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
-    meal_type: Mapped[str] = mapped_column()
-    description: Mapped[str] = mapped_column()
+    meal_type: Mapped[str] = mapped_column()    # breakfast, lunch, dinner, snack
+    description: Mapped[str] = mapped_column()  # natural language input
 
     # Returned and parsed from LLM (Gemini Flash)
     food_name: Mapped[str] = mapped_column()
