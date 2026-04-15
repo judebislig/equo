@@ -9,7 +9,7 @@ from datetime import datetime
 from database import Base
 from core.enums import MealType
 
-class User(Base):
+class Meal(Base):
     __tablename__ = "meals"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)

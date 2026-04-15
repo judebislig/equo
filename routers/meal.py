@@ -8,7 +8,8 @@ from database import get_db
 from schemas.meal import MealCreate, MealResponse
 from models.meal import Meal
 from core.enums import MealType
-from datetime import datetime, date
+from services.nutrition import parse_meal
+from datetime import datetime, date, timedelta
 
 router = APIRouter()
 
@@ -46,11 +47,15 @@ def log_meal(meal: MealCreate, db: Session = Depends(get_db)):
 # Filtered by user_id and today's date
 @router.get("/{user_id}/today", response_model=list[MealResponse])
 def get_todays_meals(user_id: int, db: Session = Depends(get_db)):
-    today = date.today()
+    today = datetime.utcnow().date()
+
+    start = datetime.combine(today, datetime.min.time())
+    end = start + timedelta(days=1)
 
     meals = db.query(Meal).filter(
         Meal.user_id == user_id,
-        cast(Meal.logged_at, Date) == today
+        Meal.logged_at >= start,
+        Meal.logged_at <= end
     ).all()
 
     if not meals:
