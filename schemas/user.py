@@ -16,14 +16,12 @@ class UserCreate(BaseModel):
     goal: GoalType = GoalType.maintain  # bulk, cut, maintain. Default is maintain for now
     calorie_target: float
 
-
 # Shape of the incoming request body when updating an existing user
 class UserUpdate(BaseModel):
     weight: Optional[float] = None
     height: Optional[float] = None
     goal: Optional[GoalType] = None
     calorie_target: Optional[float] = None
-
 
 # Shape of the outgoing response body when returning user data
 class UserResponse(BaseModel):

@@ -27,7 +27,6 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     db.refresh(db_user)
     return db_user
 
-
 # Gets a single user by ID
 # Returns 404 if user does not exist
 @router.get("/{user_id}", response_model=UserResponse)
@@ -39,7 +38,6 @@ def get_user(user_id: int, db: Session = Depends(get_db)):
     
     return db_user
     
-
 # Update an existing user's stats or goal
 # Only updates fields that are provided - ignores None values
 # Returns 404 if user does not exist
@@ -59,7 +57,6 @@ def update_user(user_id: int, user: UserUpdate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_user)
     return db_user
-
 
 # Delete a user given an id
 @router.delete("/{user_id}", response_model=dict)

@@ -38,3 +38,59 @@ def extract_food_items(description: str) -> list[str]:
             return []
     except json.JSONDecodeError:
         return []
+    
+
+# Function to look up nutrition info for a given food item using USDA API
+def call_usda_api(food_name: str) -> dict | None:
+    url = "https://api.nal.usda.gov/fdc/v1/foods/search"
+    params = {
+        "query": food_name,
+        "api_key": USDA_API_KEY,
+        "pageSize": 1,
+        "dataType": "SR Legacy,Foundation" 
+    }
+
+    response = httpx.get(url, params=params)
+    data = response.json()
+    if not data.get("foods"):
+        print(f"No USDA data found for {food_name}")
+        return None
+    
+    food_data = data["foods"][0]
+
+    # Convert nutrition list to a dict for easier access
+    nutrients = {n["nutritionName"].lower(): n["value"] for n in food_data.get("foodNutrients", [])}
+
+    # Return standardized nutrition info - calories, protein, carbs, fat
+    return {
+        "food_name": food_data["description"],
+        "calories": nutrients.get("energy", 0),
+        "protein": nutrients.get("protein", 0),
+        "carbs": nutrients.get("carbohydrate, by difference", 0),
+        "fat": nutrients.get("total lipid (fat)", 0),
+        "estimated": False  # indicates whether this is an estimate or exact USDA data
+    }
+
+# Fallback function to estimate nutrition info using LLM if USDA lookup fails
+def llm_fallback(food_name: str, amount: str) -> dict:
+    prompt = f"""
+    Estimate the calories, protein, carbs, and fat for: "{amount} of {food_name}".
+
+    Return a JSON object:
+    {{
+        "food_name": "{food_name}",
+        "calories": estimated calories,
+        "protein": estimated protein,
+        "carbs": estimated carbs,
+        "fat": estimated fat,
+    }}
+
+    Use standard nutritional values. All numbers should be reasonable estimates for the given portion size.
+    """
+
+    response = model.generate_content(prompt)
+    result = json.loads(response.text)
+    result["estimated"] = True  # mark this as an estimate
+    return result
+
+

@@ -13,7 +13,6 @@ class MealCreate(BaseModel):
     meal_type: MealType
     description: str
 
-
 # Shape of the outgoing response body when returning meal data
 class MealResponse(BaseModel):
     id: int
