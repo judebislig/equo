@@ -74,8 +74,19 @@ def call_usda_api(food_name: str) -> dict | None:
         return None
     
     food_data = data["foods"][0]
+    
     # Convert nutrition list to a dict for easier access
-    nutrients = {n["nutrientName"].lower(): n["value"] for n in food_data.get("foodNutrients", [])}
+    nutrients = {}
+
+    for n in food_data.get("foodNutrients", []):
+        name = n.get("nutrientName", "").lower()
+        value = n.get("value")
+
+        if value is None:
+            # Some nutrients might not have a value, skip those
+            continue
+
+        nutrients[name] = value
 
     # Return standardized nutrition info - calories, protein, carbs, fat
     return {

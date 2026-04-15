@@ -47,6 +47,7 @@ def log_meal(meal: MealCreate, db: Session = Depends(get_db)):
 # Filtered by user_id and today's date
 @router.get("/{user_id}/today", response_model=list[MealResponse])
 def get_todays_meals(user_id: int, db: Session = Depends(get_db)):
+    # Will use UTC for consistency. Implementing user timezones later.
     today = datetime.utcnow().date()
 
     start = datetime.combine(today, datetime.min.time())
