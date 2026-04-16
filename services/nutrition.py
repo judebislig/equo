@@ -7,13 +7,14 @@ import httpx
 import json
 import os
 from core.food_logic import get_portion_in_grams, calculate_relevance_score
-from services.prompts import nlp_extract_ingredients_PROMPT, LLM_FALLBACK_PROMPT
+from services.prompts import EXTRACT_FOOD_ITEMS_PROMPT, LLM_FALLBACK_PROMPT
 from google import genai
 
 # Load environment variables for API keys
 USDA_API_KEY = os.getenv("USDA_API_KEY")
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 MODEL = "gemini-flash-latest"
+DEBUG_MODE = True  # Set to True to enable debug mock functions instead of actual API calls
 
 # ==========================================
 # 1. UTILITIES & JSON HELPERS
@@ -34,6 +35,31 @@ def parse_json_from_text(text: str) -> dict:
                 continue
 
     raise ValueError("No JSON object found in the text")
+
+def mock_extract_ingredients(description: str) -> list[dict]:
+    """
+    Mock function to simulate Gemini's ingredient extraction for testing purposes
+    """
+    print(f"Mock extracting ingredients from: {description}")
+    return [
+        {"item": "chicken breast", "amount": "150g"},
+        {"item": "rice", "amount": "1 cup"},
+        {"item": "broccoli", "amount": "100g"}
+    ]
+
+def mock_llm_fallback(food_name: str, amount: str) -> dict:
+    """
+    Mock function to simulate LLM fallback for testing purposes
+    """
+    print(f"Mock LLM fallback for {food_name} with amount {amount}")
+    return {
+        "food_name": food_name,
+        "calories": 100,
+        "protein": 10,
+        "carbs": 10,
+        "fat": 2,
+        "estimated": True
+    }
 
 # ==========================================
 # 2. DATA MAPPERS
@@ -69,7 +95,10 @@ def nlp_extract_ingredients(description: str) -> list[dict]:
     Main function to extract food items from a meal description
     Returns a list of dicts with "item" and "amount" keys, e.g., [{"item": "chicken breast", "amount": "150g"}, ...]
     """
-    prompt = nlp_extract_ingredients_PROMPT.format(description=description)
+    if DEBUG_MODE:
+        return mock_extract_ingredients(description)
+
+    prompt = EXTRACT_FOOD_ITEMS_PROMPT.format(description=description)
     response = client.models.generate_content(
         model=MODEL,
         contents=prompt
@@ -87,6 +116,9 @@ def llm_fallback(food_name: str, amount: str) -> dict:
     LLM fallback to estimate nutrition for a food item when USDA lookup fails
     Returns a dict with estimated nutrition info based on the LLM prompt
     """
+    if DEBUG_MODE:
+        return mock_llm_fallback(food_name, amount)
+
     response = client.models.generate_content(
         model=MODEL,
         contents=LLM_FALLBACK_PROMPT.format(amount=amount, food_name=food_name)
