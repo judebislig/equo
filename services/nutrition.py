@@ -34,6 +34,80 @@ def extract_json(text: str) -> dict:
 
     raise ValueError("No JSON object found in the text")
 
+# Helper function to convert portion descriptions into grams for scaling USDA nutrition data (e.g., "2 slices of bread" -> 60g)
+def get_portion_in_grams(amount_str: str, food_item: str) -> float:
+    # Standardize input
+    amount_str = str(amount_str).lower().strip()
+
+    # Extract number and unit using regex
+    match = re.search(r"([0-9.]+)\s*([a-zA-Z]*)", amount_str)
+    if not match:
+        return 100.0  # default to 100g if we can't parse the amount
+    
+    value = float(match.group(1))
+    unit = match.group(2)
+
+    # Conversion mapping (standard weights in grams)
+    conversions = {
+        "oz": 28.35,
+        "ounce": 28.35,
+        "lb": 453.59,
+        "cup": 240.0,
+        "tbsp": 15.0,
+        "tsp": 5.0,
+        "g": 1.0,
+        "gram": 1.0,
+        "slice": 30.0, # Average bread slice
+        "small": 100.0,
+        "medium": 150.0,
+        "large": 250.0
+    }
+
+    # Heuristic for unitless portions (like '0.5' for a tortilla)
+    if not unit or unit == "portion":
+        if any(keyword in food_item.lower() for keyword in ["bread", "tortilla", "wrap", "bun", "bagel"]):
+            return value * 80.0  # assume 80g per portion for bread-like items
+        return value * 100.0  # default portion size in grams
+    
+    return value * conversions.get(unit, 100.0)  # default to 100g if unit is unrecognized
+
+# Ranks USDA results based on string similarity and presence of red flags
+def calculate_relevance_score(query: str, fdc_item: dict) -> float:
+    description = fdc_item.get("description", "").lower()
+    query = query.lower()
+
+    # 1. Base score on fuzzy string matching
+    score = fuzz.token_sort_ratio(query, description)
+
+    # 2. Penalize if any red flag words are present in the description
+    for flag in RED_FLAGS:
+        if flag in description and flag not in query:
+            score -= 50  # arbitrary penalty for red flags
+
+    # 3. Bonus: Reliable data sources (Foundation foods are better than branded)
+    if fdc_item.get("dataType") in PREMIUM_DATA_TYPES:
+        score += 20  # arbitrary bonus for premium data types
+
+    return score
+
+# Safely pulls macros from the USDA's complex nutrient list
+def extract_macros(food_data: dict) -> dict:
+    nutrients = {}
+    for n in food_data.get("foodNutrients", []):
+        name = n.get("nutrientName", "").lower()
+        value = n.get("value", 0)
+        nutrients[name] = value
+
+    # USDA uses different keys for calories, so we check multiple possibilities
+    calories = nutrients.get("energy (kcal)") or nutrients.get("energy", 0)
+
+    return {
+        "calories": calories,
+        "protein": nutrients.get("protein", 0),
+        "carbs": nutrients.get("carbohydrate, by difference", 0),
+        "fat": nutrients.get("total lipid (fat)", 0)
+    }
+
 # Main function to extract food items from a meal description
 def extract_food_items(description: str) -> list[dict]:
     # Prompt engineering to get Gemini to extract food items from natural language description
@@ -81,45 +155,56 @@ def extract_food_items(description: str) -> list[dict]:
     return items
 
 # Function to look up nutrition info for a given food item using USDA API
-def call_usda_api(food_name: str) -> dict | None:
+def call_usda_api(food_name: str, amount_str: str) -> dict | None:
     url = "https://api.nal.usda.gov/fdc/v1/foods/search"
     params = {
         "query": food_name,
         "api_key": USDA_API_KEY,
-        "pageSize": 1,
-        "dataType": "SR Legacy,Foundation" 
+        "pageSize": 10,
+        "dataType": "SR Legacy,Foundation,Survey (FNDDS)" 
     }
 
-    response = httpx.get(url, params=params)
-    data = response.json()
-    if not data.get("foods"):
-        print(f"No USDA data found for {food_name}")
+    try:
+        response = httpx.get(url, params=params)
+        results = response.json().get("foods", [])
+        
+        if not results:
+            print(f"No USDA data found for {food_name}")
+            return None
+        
+        # 1. Rank results using our relevance scoring function
+        scored_results = []
+        for f in results:
+            score = calculate_relevance_score(food_name, f)
+            scored_results.append((score, f))
+
+        scored_results.sort(key=lambda x: x[0], reverse=True)  # sort by score descending
+        best_score, best_match = scored_results[0]
+
+        # 2. Safety check: if even the best match is poor, go to LLM fallback
+        if best_score < 45:  # arbitrary threshold for relevance
+            print(f"USDA data for '{food_name}' is not relevant enough (score: {best_score}), skipping to LLM fallback")
+            return None
+        
+        # 3. Scale macros based on portion
+        base_macros = extract_macros(best_match)
+        gram_weight = get_portion_in_grams(amount_str, food_name)
+
+        # USDA data is per 100g, so calculate scaling factor
+        multiplier = gram_weight / 100.0
+
+        # Return standardized nutrition info - calories, protein, carbs, fat
+        return {
+            "food_name": best_match["description"],
+            "calories": round(base_macros["calories"] * multiplier, 2),
+            "protein": round(base_macros["protein"] * multiplier, 2),
+            "carbs": round(base_macros["carbs"] * multiplier, 2),
+            "fat": round(base_macros["fat"] * multiplier, 2),
+            "estimated": False  # indicates whether this is an estimate or exact USDA data
+        }
+    except Exception as e:
+        print(f"USDA API error for '{food_name}': {e}")
         return None
-    
-    food_data = data["foods"][0]
-    
-    # Convert nutrition list to a dict for easier access
-    nutrients = {}
-
-    for n in food_data.get("foodNutrients", []):
-        name = n.get("nutrientName", "").lower()
-        value = n.get("value")
-
-        if value is None:
-            # Some nutrients might not have a value, skip those
-            continue
-
-        nutrients[name] = value
-
-    # Return standardized nutrition info - calories, protein, carbs, fat
-    return {
-        "food_name": food_data["description"],
-        "calories": nutrients.get("energy", 0),
-        "protein": nutrients.get("protein", 0),
-        "carbs": nutrients.get("carbohydrate, by difference", 0),
-        "fat": nutrients.get("total lipid (fat)", 0),
-        "estimated": False  # indicates whether this is an estimate or exact USDA data
-    }
 
 # Fallback function to estimate nutrition info using LLM if USDA lookup fails
 def llm_fallback(food_name: str, amount: str) -> dict:
@@ -165,9 +250,10 @@ def llm_fallback(food_name: str, amount: str) -> dict:
 
 # Main function to get nutrition info for a food item and amount
 def get_nutrition(food_name: str, amount: str) -> dict:
-    nutrition = call_usda_api(food_name)
+    # Attempt USDA lookup with scoring first
+    nutrition = call_usda_api(food_name, amount)
     if nutrition:
-        print(f"USDA data found for {food_name}: {nutrition}")
+        print(f"USDA match: {nutrition['food_name']}")
         return nutrition
     else:
         print(f"Using LLM fallback for {food_name}")
