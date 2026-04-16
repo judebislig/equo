@@ -33,6 +33,7 @@ def log_meal(meal: MealCreate, db: Session = Depends(get_db)):
     parsed = parse_meal(meal.description)
     
     # New SQLAlchemy Meal object from validated Python object (from Pydantic)
+    # We use the parsed nutrition info to populate the name, calories, protein, carbs, fat, and estimated fields in the database
     db_meal = Meal(
         user_id=meal.user_id,
         meal_type=meal.meal_type,

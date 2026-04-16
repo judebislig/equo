@@ -7,7 +7,7 @@ import httpx
 import json
 import os
 from core.food_logic import get_portion_in_grams, calculate_relevance_score
-from services.prompts import EXTRACT_FOOD_ITEMS_PROMPT, LLM_FALLBACK_PROMPT
+from services.prompts import nlp_extract_ingredients_PROMPT, LLM_FALLBACK_PROMPT
 from google import genai
 
 # Load environment variables for API keys
@@ -15,7 +15,11 @@ USDA_API_KEY = os.getenv("USDA_API_KEY")
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 MODEL = "gemini-flash-latest"
 
-def extract_json(text: str) -> dict:
+# ==========================================
+# 1. UTILITIES & JSON HELPERS
+# ==========================================
+
+def parse_json_from_text(text: str) -> dict:
     """
     Helper function to extract JSON from Gemini response text
     """
@@ -31,7 +35,11 @@ def extract_json(text: str) -> dict:
 
     raise ValueError("No JSON object found in the text")
 
-def extract_macros(food_data: dict) -> dict:
+# ==========================================
+# 2. DATA MAPPERS
+# ==========================================
+
+def map_usda_to_macros(food_data: dict) -> dict:
     """
     Extracts calories, protein, carbs, and fat from USDA food data
     Returns a dict with these values, defaulting to 0 if not found
@@ -52,23 +60,41 @@ def extract_macros(food_data: dict) -> dict:
         "fat": nutrients.get("total lipid (fat)", 0)
     }
 
-def extract_food_items(description: str) -> list[dict]:
+# ==========================================
+# 3. EXTERNAL CLIENTS (USDA & GEMINI)
+# ==========================================
+
+def nlp_extract_ingredients(description: str) -> list[dict]:
     """
     Main function to extract food items from a meal description
     Returns a list of dicts with "item" and "amount" keys, e.g., [{"item": "chicken breast", "amount": "150g"}, ...]
     """
-    prompt = EXTRACT_FOOD_ITEMS_PROMPT.format(description=description)
+    prompt = nlp_extract_ingredients_PROMPT.format(description=description)
     response = client.models.generate_content(
         model=MODEL,
         contents=prompt
     )
-    data = extract_json(response.text)
+    data = parse_json_from_text(response.text)
     items = data.get("items", [])
 
     if isinstance(items, dict):
         items = [items]  # ensure it's always a list
 
     return items
+
+def llm_fallback(food_name: str, amount: str) -> dict:
+    """
+    LLM fallback to estimate nutrition for a food item when USDA lookup fails
+    Returns a dict with estimated nutrition info based on the LLM prompt
+    """
+    response = client.models.generate_content(
+        model=MODEL,
+        contents=LLM_FALLBACK_PROMPT.format(amount=amount, food_name=food_name)
+    )
+    print(f"LLM fallback response for {food_name}: {response.text}")
+    result = parse_json_from_text(response.text)
+    result["estimated"] = True  # mark this as an estimate
+    return result
 
 def call_usda_api(food_name: str, amount_str: str) -> dict | None:
     """
@@ -92,6 +118,7 @@ def call_usda_api(food_name: str, amount_str: str) -> dict | None:
             return None
         
         # 1. Rank results using our relevance scoring function
+        # food_name is the user's query, f is the USDA food item dict, and we calculate a score for how well it matches
         scored_results = []
         for f in results:
             score = calculate_relevance_score(food_name, f)
@@ -106,8 +133,8 @@ def call_usda_api(food_name: str, amount_str: str) -> dict | None:
             return None
         
         # 3. Scale macros based on portion
-        base_macros = extract_macros(best_match)
-        gram_weight = get_portion_in_grams(amount_str, food_name)
+        base_macros = map_usda_to_macros(best_match)
+        gram_weight = get_portion_in_grams(food_name, amount_str)
 
         # USDA data is per 100g, so calculate scaling factor
         multiplier = gram_weight / 100.0
@@ -119,25 +146,15 @@ def call_usda_api(food_name: str, amount_str: str) -> dict | None:
             "protein": round(base_macros["protein"] * multiplier, 2),
             "carbs": round(base_macros["carbs"] * multiplier, 2),
             "fat": round(base_macros["fat"] * multiplier, 2),
-            "estimated": False  # indicates whether this is an estimate or exact USDA data
+            "estimated": False  # indicates this is an exact USDA data
         }
     except Exception as e:
         print(f"USDA API error for '{food_name}': {e}")
         return None
 
-def llm_fallback(food_name: str, amount: str) -> dict:
-    """
-    LLM fallback to estimate nutrition for a food item when USDA lookup fails
-    Returns a dict with estimated nutrition info based on the LLM prompt
-    """
-    response = client.models.generate_content(
-        model=MODEL,
-        contents=LLM_FALLBACK_PROMPT.format(amount=amount, food_name=food_name)
-    )
-    print(f"LLM fallback response for {food_name}: {response.text}")
-    result = extract_json(response.text)
-    result["estimated"] = True  # mark this as an estimate
-    return result
+# ==========================================
+# 4. COORDINATORS (The "Middle Managers")
+# ==========================================
 
 def get_nutrition(food_name: str, amount: str) -> dict:
     """
@@ -153,6 +170,10 @@ def get_nutrition(food_name: str, amount: str) -> dict:
         print(f"Using LLM fallback for {food_name}")
         return llm_fallback(food_name, amount)
 
+# ==========================================
+# 5. THE MAIN PIPELINE
+# ==========================================
+
 def parse_meal(description: str) -> dict:
     """
     Full meal parsing pipeline:
@@ -164,22 +185,18 @@ def parse_meal(description: str) -> dict:
     Input example: "chicken breast with rice and broccoli"
     Output example: {"food_name": "chicken breast, rice, broccoli", "calories": 600, "protein": 50, "carbs": 60, "fat": 10, "has_estimates": False}
     """
-    # Step 1: Extract food items
-    food_items = extract_food_items(description)
+    # Step 1: Extract food items and amounts using Gemini
+    food_items = nlp_extract_ingredients(description)
     print(f"Extracted food items: {food_items}")
 
     # Step 2 & 3: Get nutrition for each item, using USDA or LLM fallback
-    total = {
-        "food_names": [],
-        "calories": 0.0,
-        "protein": 0.0,
-        "carbs": 0.0,
-        "fat": 0.0,
-        "has_estimates": False
-    }
+    total = {"food_names": [], "calories": 0.0, "protein": 0.0, "carbs": 0.0, "fat": 0.0, "has_estimates": False}
 
     for item in food_items:
+        # Get nutrition info for this item and amount, including food name, calories, protein, carbs, fat, and whether it was an estimate
         nutrition = get_nutrition(item["item"], item["amount"])
+
+        # Keep track of food names and sum up macros for the whole meal
         total["food_names"].append(nutrition["food_name"])
         total["calories"] += nutrition["calories"]
         total["protein"] += nutrition["protein"]
