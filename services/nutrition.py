@@ -6,18 +6,19 @@
 import httpx
 import json
 import os
+from core.food_logic import get_portion_in_grams, calculate_relevance_score
+from services.prompts import EXTRACT_FOOD_ITEMS_PROMPT, LLM_FALLBACK_PROMPT
 from google import genai
 
-# USDA API key from environment variable
+# Load environment variables for API keys
 USDA_API_KEY = os.getenv("USDA_API_KEY")
-
-# Initialize Gemini client with API key from environment variable
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-
 MODEL = "gemini-flash-latest"
 
-# Helper function to extract JSON from Gemini response text
 def extract_json(text: str) -> dict:
+    """
+    Helper function to extract JSON from Gemini response text
+    """
     decoder = json.JSONDecoder()
 
     for i, char in enumerate(text):
@@ -30,8 +31,11 @@ def extract_json(text: str) -> dict:
 
     raise ValueError("No JSON object found in the text")
 
-# Safely pulls macros from the USDA's complex nutrient list
 def extract_macros(food_data: dict) -> dict:
+    """
+    Extracts calories, protein, carbs, and fat from USDA food data
+    Returns a dict with these values, defaulting to 0 if not found
+    """
     nutrients = {}
     for n in food_data.get("foodNutrients", []):
         name = n.get("nutrientName", "").lower()
@@ -48,43 +52,15 @@ def extract_macros(food_data: dict) -> dict:
         "fat": nutrients.get("total lipid (fat)", 0)
     }
 
-# Main function to extract food items from a meal description
 def extract_food_items(description: str) -> list[dict]:
-    # Prompt engineering to get Gemini to extract food items from natural language description
+    """
+    Main function to extract food items from a meal description
+    Returns a list of dicts with "item" and "amount" keys, e.g., [{"item": "chicken breast", "amount": "150g"}, ...]
+    """
+    prompt = EXTRACT_FOOD_ITEMS_PROMPT.format(description=description)
     response = client.models.generate_content(
         model=MODEL,
-        contents=f"""
-        Extract food items from this meal description.
-
-        IMPORTANT RULES:
-        - ONLY extract foods explicitly mentioned — do NOT guess or substitute
-        - Break down composite foods into their main components (e.g., "spaghetti with meat sauce" → "spaghetti, ground beef, tomato sauce")
-        - Do NOT change the type of food (e.g., "ham" should stay "ham", NOT "turkey ham")
-        - Do NOT convert foods into different foods (e.g., bread ≠ bagel)
-        - Preserve the original food as closely as possible
-        - Prefer simple, generic food names (e.g., "white rice", "grilled chicken", "cheddar cheese")
-        - Avoid brand names unless explicitly mentioned
-
-        PORTIONS:
-        - If a quantity is given, use it exactly (e.g., "2 slices", "12 oz")
-        - If no quantity is given, assume a reasonable standard portion:
-        - meats: 100g
-        - carbs (rice, pasta): 1 cup
-        - bread: 2 slices
-        - sauces/toppings: 1 tbsp
-        - NEVER use vague terms like "portion", "serving", or "some"
-
-        OUTPUT FORMAT:
-        Return ONLY valid JSON:
-
-        {{
-        "items": [
-            {{"item": "food name", "amount": "portion size"}}
-        ]
-        }}
-
-        Meal: "{description}"
-        """
+        contents=prompt
     )
     data = extract_json(response.text)
     items = data.get("items", [])
@@ -94,8 +70,12 @@ def extract_food_items(description: str) -> list[dict]:
 
     return items
 
-# Function to look up nutrition info for a given food item using USDA API
 def call_usda_api(food_name: str, amount_str: str) -> dict | None:
+    """
+    Function to look up nutrition info for a given food item using USDA API
+    Implements relevance scoring to find the best match and scales nutrition based on portion size
+    Returns a dict with standardized nutrition info or None if no good match is found
+    """
     url = "https://api.nal.usda.gov/fdc/v1/foods/search"
     params = {
         "query": food_name,
@@ -103,7 +83,6 @@ def call_usda_api(food_name: str, amount_str: str) -> dict | None:
         "pageSize": 10,
         "dataType": "SR Legacy,Foundation,Survey (FNDDS)" 
     }
-
     try:
         response = httpx.get(url, params=params)
         results = response.json().get("foods", [])
@@ -146,51 +125,26 @@ def call_usda_api(food_name: str, amount_str: str) -> dict | None:
         print(f"USDA API error for '{food_name}': {e}")
         return None
 
-# Fallback function to estimate nutrition info using LLM if USDA lookup fails
 def llm_fallback(food_name: str, amount: str) -> dict:
+    """
+    LLM fallback to estimate nutrition for a food item when USDA lookup fails
+    Returns a dict with estimated nutrition info based on the LLM prompt
+    """
     response = client.models.generate_content(
         model=MODEL,
-        contents=f"""
-        Estimate nutrition for a single food item.
-
-        FOOD:
-        "{amount} of {food_name}"
-
-        RULES:
-        - Use standard USDA-style nutrition estimates
-        - Use realistic portion assumptions:
-        - 1 slice cheese ≈ 20g
-        - 1 slice bread ≈ 30g
-        - 1 cup rice ≈ 200g
-        - 1 oz meat ≈ 28g
-        - If the food type is ambiguous (e.g., "cheese"), assume a common default:
-        - cheese → cheddar
-        - bread → white bread
-        - rice → white rice
-        - meat → cooked, unbreaded
-        - DO NOT assume fried, breaded, or restaurant versions unless specified
-        - Keep values realistic (no extreme calorie counts)
-
-        OUTPUT:
-        Return ONLY valid JSON:
-
-        {{
-            "food_name": "{food_name}",
-            "calories": number,
-            "protein": number,
-            "carbs": number,
-            "fat": number
-        }}
-        """
+        contents=LLM_FALLBACK_PROMPT.format(amount=amount, food_name=food_name)
     )
     print(f"LLM fallback response for {food_name}: {response.text}")
     result = extract_json(response.text)
     result["estimated"] = True  # mark this as an estimate
     return result
 
-# Main function to get nutrition info for a food item and amount
 def get_nutrition(food_name: str, amount: str) -> dict:
-    # Attempt USDA lookup with scoring first
+    """
+    Main function to get nutrition info for a food item and amount
+    Tries USDA lookup first, then falls back to LLM estimation if necessary
+    Returns a dict with nutrition info (calories, protein, carbs, fat) and whether it was estimated
+    """
     nutrition = call_usda_api(food_name, amount)
     if nutrition:
         print(f"USDA match: {nutrition['food_name']}")
@@ -199,13 +153,12 @@ def get_nutrition(food_name: str, amount: str) -> dict:
         print(f"Using LLM fallback for {food_name}")
         return llm_fallback(food_name, amount)
 
-# Main function to parse a meal description and return total nutrition info
 def parse_meal(description: str) -> dict:
     """
     Full meal parsing pipeline:
-    1. Extract food items from natural languagedescription using Gemini
-    2. Look up each item in USDA database
-    3. If USDA lookup fails, use LLM fallback to estimate nutrition
+    1. Extract food items from natural language description using Gemini
+    2. Look up each item in USDA database using relevance scoring to find best match
+    3. If USDA lookup fails or the best match is poor, use LLM fallback to estimate nutrition
     4. Sum total calories, protein, carbs, and fat for the meal
 
     Input example: "chicken breast with rice and broccoli"

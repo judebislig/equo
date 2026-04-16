@@ -8,8 +8,12 @@ from thefuzz import fuzz
 RED_FLAGS = ["spread", "beverage", "liquid", "baby food", "infant", "juice", "drink", "flavor", "sauce", "powder", "mix"]
 PREMIUM_DATA_TYPES = ["SR Legacy", "Foundation"]  # prioritize these data types in USDA results
 
-# Helper function to convert portion descriptions into grams for scaling USDA nutrition data (e.g., "2 slices of bread" -> 60g)
 def get_portion_in_grams(amount_str: str, food_item: str) -> float:
+    """
+    Converts a portion description into grams using heuristics and standard conversions
+    If the amount is unparseable, defaults to 100g
+    Returns a float representing the estimated weight in grams for the given portion description
+    """
     # Standardize input
     amount_str = str(amount_str).lower().strip()
 
@@ -45,12 +49,16 @@ def get_portion_in_grams(amount_str: str, food_item: str) -> float:
     
     return value * conversions.get(unit, 100.0)  # default to 100g if unit is unrecognized
 
-# Ranks USDA results based on string similarity and presence of red flags
 def calculate_relevance_score(query: str, fdc_item: dict) -> float:
+    """
+    Calculates a relevance score for a USDA food item based on the user's query
+    Higher score means more relevant. Uses fuzzy string matching and penalizes items with red flag words.
+    """
     description = fdc_item.get("description", "").lower()
     query = query.lower()
 
-    # 1. Base score on fuzzy string matching
+    # 1. Base score on fuzzy string matching - how closely does the USDA description match the user's query?
+    # Fuzz score will be between 0 and 100, where 100 is an exact match
     score = fuzz.token_sort_ratio(query, description)
 
     # 2. Penalize if any red flag words are present in the description

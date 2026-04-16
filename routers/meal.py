@@ -13,17 +13,23 @@ from datetime import datetime, date, timedelta
 
 router = APIRouter()
 
-# Parse a meal description and return macros without saving to database
-# Useful for previewing what Gemini + USDA will return before committing
 @router.post("/parse", response_model=dict)
 def preview_meal(description: str, db: Session = Depends(get_db)):
+    """
+    Parse a meal description and return macros without saving to database
+    Useful for previewing what Gemini + USDA will return before committing
+    Returns a dict with total calories, protein, carbs, fat, and whether any item was estimated
+    """
     result = parse_meal(description)
     return result
 
-# Parse a meal description and save to the database
-# Calls Gemini to extract food items, looks up each in USDA database, sums macros, saves result linked to user
 @router.post("/", response_model=MealResponse)
 def log_meal(meal: MealCreate, db: Session = Depends(get_db)):
+    """
+    Parse a meal description and save to the database
+    Calls Gemini to extract food items, looks up each in USDA database, sums macros, saves result linked to user
+    Returns the saved Meal object with all nutrition info and whether any item was estimated
+    """
     parsed = parse_meal(meal.description)
     
     # New SQLAlchemy Meal object from validated Python object (from Pydantic)
@@ -43,10 +49,13 @@ def log_meal(meal: MealCreate, db: Session = Depends(get_db)):
     db.refresh(db_meal)
     return db_meal
 
-# Get all meals logged by a user today
-# Filtered by user_id and today's date
 @router.get("/{user_id}/today", response_model=list[MealResponse])
 def get_todays_meals(user_id: int, db: Session = Depends(get_db)):
+    """
+    Get all meals logged by a user today
+    Filtered by user_id and today's date
+    Returns a list of Meal objects for the user and date, or 404 if none found
+    """
     # Will use UTC for consistency. Implementing user timezones later.
     today = datetime.utcnow().date()
 
@@ -64,10 +73,12 @@ def get_todays_meals(user_id: int, db: Session = Depends(get_db)):
 
     return meals
 
-# Get all means ever logged by a user
-# Returns in reverse chronological order - most recent first
 @router.get("/{user_id}/history", response_model=list[MealResponse])
 def get_meal_history(user_id: int, db: Session = Depends(get_db)):
+    """
+    Get all meals ever logged by a user
+    Returns in reverse chronological order - most recent first
+    """
     meals = db.query(Meal).filter(
         Meal.user_id == user_id
     ).order_by(Meal.logged_at.desc()).all()
@@ -77,9 +88,12 @@ def get_meal_history(user_id: int, db: Session = Depends(get_db)):
 
     return meals
 
-# Delete a meal given an id
 @router.delete("/{meal_id}")
 def delete_meal(meal_id: int, db: Session = Depends(get_db)):
+    """
+    Delete a meal given its id
+    Returns a success message if deleted, or 404 if meal not found
+    """
     db_meal = db.query(Meal).filter(Meal.id == meal_id).first()
 
     if not db_meal:

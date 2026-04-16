@@ -10,9 +10,12 @@ from core.enums import GoalType
 
 router = APIRouter()
 
-# Create a new user
 @router.post("/", response_model=UserResponse)
 def create_user(user: UserCreate, db: Session = Depends(get_db)):
+    """
+    Create a new user with the provided information
+    Returns the created user object
+    """
     # New SQLAlchemy User object from validated Python object (from Pydantic)
     db_user = User(
         name = user.name,
@@ -27,10 +30,12 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     db.refresh(db_user)
     return db_user
 
-# Gets a single user by ID
-# Returns 404 if user does not exist
 @router.get("/{user_id}", response_model=UserResponse)
 def get_user(user_id: int, db: Session = Depends(get_db)):
+    """
+    Gets a single user by ID
+    Returns 404 if user does not exist
+    """
     db_user = db.query(User).filter(User.id == user_id).first()
 
     if not db_user:
@@ -38,11 +43,13 @@ def get_user(user_id: int, db: Session = Depends(get_db)):
     
     return db_user
     
-# Update an existing user's stats or goal
-# Only updates fields that are provided - ignores None values
-# Returns 404 if user does not exist
 @router.put("/{user_id}", response_model=UserResponse)
 def update_user(user_id: int, user: UserUpdate, db: Session = Depends(get_db)):
+    """
+    Update an existing user's stats or goal
+    Only updates fields that are provided - ignores None values
+    Returns 404 if user does not exist
+    """
     db_user = db.query(User).filter(User.id == user_id).first()
 
     if not db_user:
@@ -58,9 +65,12 @@ def update_user(user_id: int, user: UserUpdate, db: Session = Depends(get_db)):
     db.refresh(db_user)
     return db_user
 
-# Delete a user given an id
 @router.delete("/{user_id}", response_model=dict)
 def delete_user(user_id: int, db: Session = Depends(get_db)):
+    """
+    delete a user by ID
+    Returns a success message or 404 if user does not exist
+    """
     db_user = db.query(User).filter(User.id == user_id).first()
 
     if not db_user:
