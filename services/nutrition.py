@@ -7,14 +7,18 @@ import httpx
 import json
 import os
 import re
+from thefuzz import fuzz
 from google import genai
+
+# Constants for scoring USDA results
+RED_FLAGS = ["spread", "beverage", "liquid", "baby food", "infant", "juice", "drink", "flavor", "sauce", "powder", "mix"]
+PREMIUM_DATA_TYPES = ["SR Legacy", "Foundation"]  # prioritize these data types in USDA results
+USDA_API_KEY = os.getenv("USDA_API_KEY")
 
 # Initialize Gemini client with API key from environment variable
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 MODEL = "gemini-flash-latest"
-
-USDA_API_KEY = os.getenv("USDA_API_KEY")
 
 # Helper function to extract JSON from Gemini response text
 def extract_json(text: str) -> dict:
@@ -36,17 +40,36 @@ def extract_food_items(description: str) -> list[dict]:
     response = client.models.generate_content(
         model=MODEL,
         contents=f"""
-        Extract the food items from this meal description: '{description}'. 
-        Return ONLY valid JSON in this format:
+        Extract food items from this meal description.
+
+        IMPORTANT RULES:
+        - ONLY extract foods explicitly mentioned — do NOT guess or substitute
+        - Break down composite foods into their main components (e.g., "spaghetti with meat sauce" → "spaghetti, ground beef, tomato sauce")
+        - Do NOT change the type of food (e.g., "ham" should stay "ham", NOT "turkey ham")
+        - Do NOT convert foods into different foods (e.g., bread ≠ bagel)
+        - Preserve the original food as closely as possible
+        - Prefer simple, generic food names (e.g., "white rice", "grilled chicken", "cheddar cheese")
+        - Avoid brand names unless explicitly mentioned
+
+        PORTIONS:
+        - If a quantity is given, use it exactly (e.g., "2 slices", "12 oz")
+        - If no quantity is given, assume a reasonable standard portion:
+        - meats: 100g
+        - carbs (rice, pasta): 1 cup
+        - bread: 2 slices
+        - sauces/toppings: 1 tbsp
+        - NEVER use vague terms like "portion", "serving", or "some"
+
+        OUTPUT FORMAT:
+        Return ONLY valid JSON:
 
         {{
-            "items": [
-                {{"item": "food name", "amount": "portion size"}}
-            ]
+        "items": [
+            {{"item": "food name", "amount": "portion size"}}
+        ]
         }}
 
-        If no amount is specified, estimate a standard single portion. 
-        Be specific - "chicken" should become "chicken breast" or "chicken thigh" if possible.
+        Meal: "{description}"
         """
     )
     data = extract_json(response.text)
@@ -103,20 +126,39 @@ def llm_fallback(food_name: str, amount: str) -> dict:
     response = client.models.generate_content(
         model=MODEL,
         contents=f"""
-        Estimate the calories, protein, carbs, and fat for: "{amount} of {food_name}".
+        Estimate nutrition for a single food item.
 
-        Return a JSON object:
+        FOOD:
+        "{amount} of {food_name}"
+
+        RULES:
+        - Use standard USDA-style nutrition estimates
+        - Use realistic portion assumptions:
+        - 1 slice cheese ≈ 20g
+        - 1 slice bread ≈ 30g
+        - 1 cup rice ≈ 200g
+        - 1 oz meat ≈ 28g
+        - If the food type is ambiguous (e.g., "cheese"), assume a common default:
+        - cheese → cheddar
+        - bread → white bread
+        - rice → white rice
+        - meat → cooked, unbreaded
+        - DO NOT assume fried, breaded, or restaurant versions unless specified
+        - Keep values realistic (no extreme calorie counts)
+
+        OUTPUT:
+        Return ONLY valid JSON:
+
         {{
             "food_name": "{food_name}",
-            "calories": estimated calories,
-            "protein": estimated protein,
-            "carbs": estimated carbs,
-            "fat": estimated fat,
+            "calories": number,
+            "protein": number,
+            "carbs": number,
+            "fat": number
         }}
-
-        Use standard nutritional values. All numbers should be reasonable estimates for the given portion size.
         """
     )
+    print(f"LLM fallback response for {food_name}: {response.text}")
     result = extract_json(response.text)
     result["estimated"] = True  # mark this as an estimate
     return result
