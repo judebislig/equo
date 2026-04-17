@@ -48,7 +48,6 @@ def get_portion_in_grams(food_item: str, amount_str: str) -> float:
         if any(keyword in food_item.lower() for keyword in ["bread", "tortilla", "wrap", "bun", "bagel"]):
             return value * 80.0  # assume 80g per portion for bread-like items
         return value * 100.0  # default portion size in grams
-    
     return value * conversions.get(unit, 100.0)  # default to 100g if unit is unrecognized
 
 def calculate_relevance_score(query: str, fdc_item: dict) -> float:

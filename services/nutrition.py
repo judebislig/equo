@@ -44,7 +44,8 @@ def mock_extract_ingredients(description: str) -> list[dict]:
     return [
         {"item": "chicken breast", "amount": "150g"},
         {"item": "rice", "amount": "1 cup"},
-        {"item": "broccoli", "amount": "100g"}
+        {"item": "broccoli", "amount": "100g"},
+        {"item": "cheese", "amount": "50g"}
     ]
 
 def mock_llm_fallback(food_name: str, amount: str) -> dict:
@@ -76,19 +77,30 @@ def map_usda_to_macros(food_data: dict) -> dict:
         value = n.get("value", 0)
         nutrients[name] = value
 
-    # USDA uses different keys for calories, so we check multiple possibilities
-    calories = (
+    # 1. Get base calories using multiple possible keys to handle variations in USDA data
+    base_cal = (
         nutrients.get("energy (kcal)") or 
         nutrients.get("energy", 0) or
         next((n.get("value") for n in food_data.get("foodNutrients", [])
             if "energy" in n.get("nutrientName", "").lower() and n.get("unitName") == "KCAL"), 0)
     )
 
+    # 2. Determine the "Data Base Unit"
+    # Branded foods provide 'serviceSize' (e.g. 28 for 28g), while Foundation foods are typically per 100g
+    serving_size = food_data.get("servingSize")
+
+    # If a serving size exists and isn't 100, normalize data back to 100g
+    # For example, if 740 cals is for a 200g wedge, normaliation_factor = 100/200 = 0.5
+    # 740 cals * 0.5 = 370 cals per 100g, which is more comparable to other items
+    normalization_factor = 1.0
+    if serving_size and serving_size > 0 and serving_size != 100:
+        normalization_factor = 100.0 / serving_size
+
     return {
-        "calories": calories,
-        "protein": nutrients.get("protein", 0),
-        "carbs": nutrients.get("carbohydrate, by difference", 0),
-        "fat": nutrients.get("total lipid (fat)", 0)
+        "calories": base_cal * normalization_factor,
+        "protein": nutrients.get("protein", 0) * normalization_factor,
+        "carbs": round(max(0, nutrients.get("carbohydrate, by difference", 0) * normalization_factor), 1),
+        "fat": nutrients.get("total lipid (fat)", 0) * normalization_factor
     }
 
 # ==========================================
@@ -172,6 +184,13 @@ def call_usda_api(food_name: str, amount_str: str) -> dict | None:
         
         # 3. Scale macros based on portion
         base_macros = map_usda_to_macros(best_match)
+
+        # Sanity check: pure fat is 900kcal/100g. If the base is higher than 950,
+        # the USDA entry is likely using a non-standard unit (like 'per pound')
+        if base_macros["calories"] > 950:
+            print(f"USDA data for '{food_name}' has unusually high calories ({base_macros['calories']} kcal), likely due to non-standard serving size. Skipping to LLM fallback.")
+            return None
+
         gram_weight = get_portion_in_grams(food_name, amount_str)
 
         # USDA data is per 100g, so calculate scaling factor
@@ -249,7 +268,7 @@ def parse_meal(description: str) -> dict:
         "food_name": ", ".join(total["food_names"]),
         "calories": total["calories"],
         "protein": total["protein"],
-        "carbs": total["carbs"],
+        "carbs": round(max(0, total["carbs"]), 1),  # carbs can sometimes be negative due to rounding, so we ensure it's not below 0
         "fat": total["fat"],
         "has_estimates": total["has_estimates"]
     }
