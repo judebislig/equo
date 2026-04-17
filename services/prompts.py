@@ -57,7 +57,7 @@ RULES:
 - Keep values realistic (no extreme calorie counts)
 
 OUTPUT:
-Return ONLY valid JSON:
+Return a JSON array of objects, each containing: 'food_name', 'calories', 'protein', 'carbs', and 'fat'. Use the specific amounts provided."
 
 {{
     "food_name": "{food_name}",

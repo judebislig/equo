@@ -128,22 +128,34 @@ def nlp_extract_ingredients(description: str) -> list[dict]:
 
     return items
 
-def llm_fallback(food_name: str, amount: str) -> dict:
+def estimate_nutrition_batch(items: list[dict]) -> list[dict]:
     """
-    LLM fallback to estimate nutrition for a food item when USDA lookup fails
-    Returns a dict with estimated nutrition info based on the LLM prompt
+    Takes a list of items that failed USDA lookup and estimates nutrition for each using a single Gemini request
     """
+    if not items:
+        return []
+    
     if DEBUG_MODE:
-        return mock_llm_fallback(food_name, amount)
+        print(f"Mock estimating nutrition for batch: {items}")
+        return [mock_llm_fallback(i["item"], i["amount"]) for i in items]
+    
+    # Real LLM logic
+    # Convert list to a readable string for this prompt
+    items_description = ", ".join([f"{i['amount']} of {i['item']}" for i in items])
 
-    response = client.models.generate_content(
-        model=MODEL,
-        contents=LLM_FALLBACK_PROMPT.format(amount=amount, food_name=food_name)
-    )
-    print(f"LLM fallback response for {food_name}: {response.text}")
-    result = parse_json_from_text(response.text)
-    result["estimated"] = True  # mark this as an estimate
-    return result
+    prompt = LLM_FALLBACK_PROMPT.format(items_list=items_description)
+    response = client.models.generate_content(model=MODEL, contents=prompt)
+
+    # Extract JSON array of nutrition estimates from the response
+    results = parse_json_from_text(response.text)
+
+    if isinstance(results, dict):
+        results = [results]  # ensure it's always a list
+
+    for r in results:
+        r["estimated"] = True  # mark these as estimates
+
+    return results
 
 def call_usda_api(food_name: str, amount_str: str) -> dict | None:
     """
@@ -210,25 +222,7 @@ def call_usda_api(food_name: str, amount_str: str) -> dict | None:
         return None
 
 # ==========================================
-# 4. COORDINATORS (The "Middle Managers")
-# ==========================================
-
-def get_nutrition(food_name: str, amount: str) -> dict:
-    """
-    Main function to get nutrition info for a food item and amount
-    Tries USDA lookup first, then falls back to LLM estimation if necessary
-    Returns a dict with nutrition info (calories, protein, carbs, fat) and whether it was estimated
-    """
-    nutrition = call_usda_api(food_name, amount)
-    if nutrition:
-        print(f"USDA match: {nutrition}")
-        return nutrition
-    else:
-        print(f"Using LLM fallback for {food_name}")
-        return llm_fallback(food_name, amount)
-
-# ==========================================
-# 5. THE MAIN PIPELINE
+# 4. THE MAIN PIPELINE
 # ==========================================
 
 def parse_meal(description: str) -> dict:
@@ -246,22 +240,46 @@ def parse_meal(description: str) -> dict:
     food_items = nlp_extract_ingredients(description)
     print(f"Extracted food items: {food_items}")
 
-    # Step 2 & 3: Get nutrition for each item, using USDA or LLM fallback
-    total = {"food_names": [], "calories": 0.0, "protein": 0.0, "carbs": 0.0, "fat": 0.0, "has_estimates": False}
+    final_nutrition_data = []
+    missing_for_llm = []
 
+    # Step 2: Get nutrition for each item, using USDA or LLM fallback
     for item in food_items:
         # Get nutrition info for this item and amount, including food name, calories, protein, carbs, fat, and whether it was an estimate
-        nutrition = get_nutrition(item["item"], item["amount"])
+        nutrition = call_usda_api(item["item"], item["amount"])
+    
+        if nutrition:
+            # Add original name for UI consistency
+            nutrition["display_name"] = item["item"].capitalize()
+            final_nutrition_data.append(nutrition)
 
+        else:
+            # If failed USDA or hit the 950 calorie sanity check, add to LLM batch list
+            missing_for_llm.append(item)
+
+    # Step 3: The batch fallback to LLM for any items that failed USDA lookup or had poor matches
+    if missing_for_llm:
+        print(f"Batch LLM fallback for items: {missing_for_llm}")
+        batch_results = estimate_nutrition_batch(missing_for_llm)
+        
+        # Merge back with the display names
+        for i, est in enumerate(batch_results):
+            est["display_name"] = missing_for_llm[i]["item"].capitalize()
+            final_nutrition_data.append(est)
+
+    # Step 4: Aggregation - sum up total calories, protein, carbs, and fat for the whole meal
+    total = {"calories": 0, "protein": 0, "carbs": 0, "fat": 0, "food_names": [], "has_estimates": False}
+
+    for entry in final_nutrition_data:
         # Keep track of food names and sum up macros for the whole meal
-        total["food_names"].append(nutrition["food_name"])
-        total["calories"] += nutrition["calories"]
-        total["protein"] += nutrition["protein"]
-        total["carbs"] += nutrition["carbs"]
-        total["fat"] += nutrition["fat"]
+        total["food_names"].append(entry["display_name"])
+        total["calories"] += entry.get("calories", 0)
+        total["protein"] += entry.get("protein", 0)
+        total["carbs"] += max(0, entry.get("carbs", 0)) # ensure carbs don't go negative due to rounding
+        total["fat"] += entry.get("fat", 0)
 
         # If any item was estimated, mark the whole meal as having estimates
-        if nutrition.get("estimated"):
+        if entry.get("estimated"):
             total["has_estimates"] = True
 
     return {
