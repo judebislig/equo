@@ -77,7 +77,12 @@ def map_usda_to_macros(food_data: dict) -> dict:
         nutrients[name] = value
 
     # USDA uses different keys for calories, so we check multiple possibilities
-    calories = nutrients.get("energy (kcal)") or nutrients.get("energy", 0)
+    calories = (
+        nutrients.get("energy (kcal)") or 
+        nutrients.get("energy", 0) or
+        next((n.get("value") for n in food_data.get("foodNutrients", [])
+            if "energy" in n.get("nutrientName", "").lower() and n.get("unitName") == "KCAL"), 0)
+    )
 
     return {
         "calories": calories,
@@ -139,10 +144,11 @@ def call_usda_api(food_name: str, amount_str: str) -> dict | None:
         "query": food_name,
         "api_key": USDA_API_KEY,
         "pageSize": 10,
-        "dataType": "SR Legacy,Foundation,Survey (FNDDS)" 
+        "dataType": "Foundation,SR Legacy"
     }
     try:
         response = httpx.get(url, params=params)
+
         results = response.json().get("foods", [])
         
         if not results:
@@ -196,7 +202,7 @@ def get_nutrition(food_name: str, amount: str) -> dict:
     """
     nutrition = call_usda_api(food_name, amount)
     if nutrition:
-        print(f"USDA match: {nutrition['food_name']}")
+        print(f"USDA match: {nutrition}")
         return nutrition
     else:
         print(f"Using LLM fallback for {food_name}")

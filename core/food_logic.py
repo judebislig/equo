@@ -5,7 +5,9 @@
 import re
 from thefuzz import fuzz
 
-RED_FLAGS = ["spread", "beverage", "liquid", "baby food", "infant", "juice", "drink", "flavor", "sauce", "powder", "mix"]
+RED_FLAGS = ["spread", "beverage", "liquid", "baby food", "infant", "juice", 
+    "drink", "flavor", "sauce", "powder", "mix", "cracker", "cake",
+    "roll", "deli", "patty", "nugget"]
 PREMIUM_DATA_TYPES = ["SR Legacy", "Foundation"]  # prioritize these data types in USDA results
 
 def get_portion_in_grams(food_item: str, amount_str: str) -> float:
