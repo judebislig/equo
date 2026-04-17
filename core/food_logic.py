@@ -50,21 +50,21 @@ def get_portion_in_grams(food_item: str, amount_str: str) -> float:
         return value * 100.0  # default portion size in grams
     return value * conversions.get(unit, 100.0)  # default to 100g if unit is unrecognized
 
-def calculate_relevance_score(query: str, fdc_item: dict) -> float:
+def calculate_relevance_score(user_query: str, fdc_item: dict) -> float:
     """
     Calculates a relevance score for a USDA food item based on the user's query
     Higher score means more relevant. Uses fuzzy string matching and penalizes items with red flag words.
     """
-    description = fdc_item.get("description", "").lower()
-    query = query.lower()
+    usda_description = fdc_item.get("description", "").lower()
+    user_query = user_query.lower()
 
     # 1. Base score on fuzzy string matching - how closely does the USDA description (name)match the user's query?
     # Fuzz score will be between 0 and 100, where 100 is an exact match
-    score = fuzz.token_sort_ratio(query, description)
+    score = fuzz.token_sort_ratio(user_query, usda_description)
 
     # 2. Penalize if any red flag words are present in the description
     for flag in RED_FLAGS:
-        if flag in description and flag not in query:
+        if flag in usda_description and flag not in user_query:
             score -= 50  # arbitrary penalty for red flags
 
     # 3. Bonus: Reliable data sources (Foundation foods are better than branded)

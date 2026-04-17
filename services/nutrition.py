@@ -97,10 +97,10 @@ def map_usda_to_macros(food_data: dict) -> dict:
         normalization_factor = 100.0 / serving_size
 
     return {
-        "calories": base_cal * normalization_factor,
-        "protein": nutrients.get("protein", 0) * normalization_factor,
-        "carbs": round(max(0, nutrients.get("carbohydrate, by difference", 0) * normalization_factor), 1),
-        "fat": nutrients.get("total lipid (fat)", 0) * normalization_factor
+        "calories_per_100g": base_cal * normalization_factor,
+        "protein_per_100g": nutrients.get("protein", 0) * normalization_factor,
+        "carbs_per_100g": round(max(0, nutrients.get("carbohydrate, by difference", 0) * normalization_factor), 1),
+        "fat_per_100g": nutrients.get("total lipid (fat)", 0) * normalization_factor
     }
 
 # ==========================================
@@ -172,7 +172,6 @@ def call_usda_api(food_name: str, amount_str: str) -> dict | None:
     }
     try:
         response = httpx.get(url, params=params)
-
         results = response.json().get("foods", [])
         
         if not results:
@@ -199,8 +198,8 @@ def call_usda_api(food_name: str, amount_str: str) -> dict | None:
 
         # Sanity check: pure fat is 900kcal/100g. If the base is higher than 950,
         # the USDA entry is likely using a non-standard unit (like 'per pound')
-        if base_macros["calories"] > 950:
-            print(f"USDA data for '{food_name}' has unusually high calories ({base_macros['calories']} kcal), likely due to non-standard serving size. Skipping to LLM fallback.")
+        if base_macros["calories_per_100g"] > 950:
+            print(f"USDA data for '{food_name}' has unusually high calories ({base_macros['calories_per_100g']} kcal), likely due to non-standard serving size. Skipping to LLM fallback.")
             return None
 
         gram_weight = get_portion_in_grams(food_name, amount_str)
@@ -211,10 +210,10 @@ def call_usda_api(food_name: str, amount_str: str) -> dict | None:
         # Return standardized nutrition info - calories, protein, carbs, fat
         return {
             "food_name": best_match["description"],
-            "calories": round(base_macros["calories"] * multiplier, 2),
-            "protein": round(base_macros["protein"] * multiplier, 2),
-            "carbs": round(base_macros["carbs"] * multiplier, 2),
-            "fat": round(base_macros["fat"] * multiplier, 2),
+            "calories": round(base_macros["calories_per_100g"] * multiplier, 2),
+            "protein": round(base_macros["protein_per_100g"] * multiplier, 2),
+            "carbs": round(base_macros["carbs_per_100g"] * multiplier, 2),
+            "fat": round(base_macros["fat_per_100g"] * multiplier, 2),
             "estimated": False  # indicates this is an exact USDA data
         }
     except Exception as e:
@@ -241,52 +240,52 @@ def parse_meal(description: str) -> dict:
     print(f"Extracted food items: {food_items}")
 
     final_nutrition_data = []
-    missing_for_llm = []
+    fallback_items_queue = []
 
     # Step 2: Get nutrition for each item, using USDA or LLM fallback
     for item in food_items:
         # Get nutrition info for this item and amount, including food name, calories, protein, carbs, fat, and whether it was an estimate
-        nutrition = call_usda_api(item["item"], item["amount"])
+        usda_nutrition = call_usda_api(item["item"], item["amount"])
     
-        if nutrition:
+        if usda_nutrition:
             # Add original name for UI consistency
-            nutrition["display_name"] = item["item"].capitalize()
-            final_nutrition_data.append(nutrition)
+            usda_nutrition["display_name"] = item["item"].capitalize()
+            final_nutrition_data.append(usda_nutrition)
 
         else:
             # If failed USDA or hit the 950 calorie sanity check, add to LLM batch list
-            missing_for_llm.append(item)
+            fallback_items_queue.append(item)
 
     # Step 3: The batch fallback to LLM for any items that failed USDA lookup or had poor matches
-    if missing_for_llm:
-        print(f"Batch LLM fallback for items: {missing_for_llm}")
-        batch_results = estimate_nutrition_batch(missing_for_llm)
+    if fallback_items_queue:
+        print(f"Batch LLM fallback for items: {fallback_items_queue}")
+        batch_results = estimate_nutrition_batch(fallback_items_queue)
         
         # Merge back with the display names
         for i, est in enumerate(batch_results):
-            est["display_name"] = missing_for_llm[i]["item"].capitalize()
+            est["display_name"] = fallback_items_queue[i]["item"].capitalize()
             final_nutrition_data.append(est)
 
     # Step 4: Aggregation - sum up total calories, protein, carbs, and fat for the whole meal
-    total = {"calories": 0, "protein": 0, "carbs": 0, "fat": 0, "food_names": [], "has_estimates": False}
+    meal_summary = {"calories": 0, "protein": 0, "carbs": 0, "fat": 0, "food_names": [], "has_estimates": False}
 
     for entry in final_nutrition_data:
         # Keep track of food names and sum up macros for the whole meal
-        total["food_names"].append(entry["display_name"])
-        total["calories"] += entry.get("calories", 0)
-        total["protein"] += entry.get("protein", 0)
-        total["carbs"] += max(0, entry.get("carbs", 0)) # ensure carbs don't go negative due to rounding
-        total["fat"] += entry.get("fat", 0)
+        meal_summary["food_names"].append(entry["display_name"])
+        meal_summary["calories"] += entry.get("calories", 0)
+        meal_summary["protein"] += entry.get("protein", 0)
+        meal_summary["carbs"] += max(0, entry.get("carbs", 0)) # ensure carbs don't go negative due to rounding
+        meal_summary["fat"] += entry.get("fat", 0)
 
         # If any item was estimated, mark the whole meal as having estimates
         if entry.get("estimated"):
-            total["has_estimates"] = True
+            meal_summary["has_estimates"] = True
 
     return {
-        "food_name": ", ".join(total["food_names"]),
-        "calories": total["calories"],
-        "protein": total["protein"],
-        "carbs": round(max(0, total["carbs"]), 1),  # carbs can sometimes be negative due to rounding, so we ensure it's not below 0
-        "fat": total["fat"],
-        "has_estimates": total["has_estimates"]
+        "food_name": ", ".join(meal_summary["food_names"]),
+        "calories": meal_summary["calories"],
+        "protein": meal_summary["protein"],
+        "carbs": round(max(0, meal_summary["carbs"]), 1),  # carbs can sometimes be negative due to rounding, so we ensure it's not below 0
+        "fat": meal_summary["fat"],
+        "has_estimates": meal_summary["has_estimates"]
     }
