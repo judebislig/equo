@@ -36,34 +36,15 @@ Meal: "{description}"
 """
 
 LLM_FALLBACK_PROMPT = """
-Estimate nutrition for a single food item.
-
-FOOD:
-"{amount} of {food_name}"
+Estimate nutrition for each of these items INDIVIDUALLY: {items_list}
+Return a JSON array with EXACTLY {count} objects. 
+Do not combine items.
 
 RULES:
-- Use standard USDA-style nutrition estimates
-- Use realistic portion assumptions:
-- 1 slice cheese ≈ 20g
-- 1 slice bread ≈ 30g
-- 1 cup rice ≈ 200g
-- 1 oz meat ≈ 28g
-- If the food type is ambiguous (e.g., "cheese"), assume a common default:
-- cheese → cheddar
-- bread → white bread
-- rice → white rice
-- meat → cooked, unbreaded
-- DO NOT assume fried, breaded, or restaurant versions unless specified
-- Keep values realistic (no extreme calorie counts)
+- Use standard USDA-style estimates.
+- Assumptions: 1 slice cheese (20g), 1 slice bread (30g), 1 cup rice (200g).
+- Defaults: cheese=cheddar, bread=white, rice=white, meat=cooked/unbreaded.
+- Return ONLY a JSON array of objects.
 
-OUTPUT:
-Return a JSON array of objects, each containing: 'food_name', 'calories', 'protein', 'carbs', and 'fat'. Use the specific amounts provided."
-
-{{
-    "food_name": "{food_name}",
-    "calories": number,
-    "protein": number,
-    "carbs": number,
-    "fat": number
-}}
+JSON Keys: "food_name", "calories", "protein", "carbs", "fat"
 """

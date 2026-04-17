@@ -14,7 +14,7 @@ from google import genai
 USDA_API_KEY = os.getenv("USDA_API_KEY")
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 MODEL = "gemini-flash-latest"
-DEBUG_MODE = True  # Set to True to enable debug mock functions instead of actual API calls
+DEBUG_MODE = False  # Set to True to enable debug mock functions instead of actual API calls
 
 # ==========================================
 # 1. UTILITIES & JSON HELPERS
@@ -42,10 +42,9 @@ def mock_extract_ingredients(description: str) -> list[dict]:
     """
     print(f"Mock extracting ingredients from: {description}")
     return [
-        {"item": "chicken breast", "amount": "150g"},
-        {"item": "rice", "amount": "1 cup"},
-        {"item": "broccoli", "amount": "100g"},
-        {"item": "cheese", "amount": "50g"}
+        {"item": "ham", "amount": "100g"},
+        {"item": "cinnamon raisin bread", "amount": "2 slices"},
+        {"item": "cheese", "amount": "2 slices"}
     ]
 
 def mock_llm_fallback(food_name: str, amount: str) -> dict:
@@ -143,7 +142,7 @@ def estimate_nutrition_batch(items: list[dict]) -> list[dict]:
     # Convert list to a readable string for this prompt
     items_description = ", ".join([f"{i['amount']} of {i['item']}" for i in items])
 
-    prompt = LLM_FALLBACK_PROMPT.format(items_list=items_description)
+    prompt = LLM_FALLBACK_PROMPT.format(items_list=items_description, count=len(items))
     response = client.models.generate_content(model=MODEL, contents=prompt)
 
     # Extract JSON array of nutrition estimates from the response
@@ -156,6 +155,32 @@ def estimate_nutrition_batch(items: list[dict]) -> list[dict]:
         r["estimated"] = True  # mark these as estimates
 
     return results
+
+def is_usda_data_sane(food_name: str, macros_per_100g: dict) -> bool:
+    print(f"Sanity checking USDA data for '{food_name}': {macros_per_100g} kcal per 100g")
+    name = food_name.lower()
+    cals = macros_per_100g["calories_per_100g"]
+
+    # Example sanity check: pure fat is 900kcal/100g. If the base is higher than 950,
+    # the USDA entry is likely using a non-standard unit (like 'per pound')
+    if cals > 950:
+        print(f"USDA data for '{food_name}' has unusually high calories ({macros_per_100g} kcal), likely due to non-standard serving size.")
+        return False
+    
+    # Leafy greens or very low-calorie items should not have high calories per 100g
+    if any(x in name for x in ["spinach", "kale", "lettuce", "broccoli", "cucumber", "cabbage"]) and cals > 50:
+        return False
+    
+    # Pure meat should not have much carbs
+    if any(x in name for x in ["chicken", "beef", "pork", "ham", "turkey", "sausage", "lamb"]) and macros_per_100g.get("carbs_per_100g", 0) > 10:
+        return False
+
+    # Dry pasta check
+    if "pasta" in name and cals > 400:
+        print(f"USDA data for '{food_name}' has unusually high calories ({macros_per_100g} kcal), likely due to being dry pasta. This can be misleading for users who typically eat cooked pasta.")
+        return False
+
+    return True
 
 def call_usda_api(food_name: str, amount_str: str) -> dict | None:
     """
@@ -196,10 +221,8 @@ def call_usda_api(food_name: str, amount_str: str) -> dict | None:
         # 3. Scale macros based on portion
         base_macros = map_usda_to_macros(best_match)
 
-        # Sanity check: pure fat is 900kcal/100g. If the base is higher than 950,
-        # the USDA entry is likely using a non-standard unit (like 'per pound')
-        if base_macros["calories_per_100g"] > 950:
-            print(f"USDA data for '{food_name}' has unusually high calories ({base_macros['calories_per_100g']} kcal), likely due to non-standard serving size. Skipping to LLM fallback.")
+        if not is_usda_data_sane(food_name, base_macros):
+            print(f"USDA data for '{food_name}' failed sanity check, skipping to LLM fallback")
             return None
 
         gram_weight = get_portion_in_grams(food_name, amount_str)
@@ -261,17 +284,20 @@ def parse_meal(description: str) -> dict:
         print(f"Batch LLM fallback for items: {fallback_items_queue}")
         batch_results = estimate_nutrition_batch(fallback_items_queue)
         
-        # Merge back with the display names
-        for i, est in enumerate(batch_results):
-            est["display_name"] = fallback_items_queue[i]["item"].capitalize()
+        for i in range(min(len(batch_results), len(fallback_items_queue))):
+            est = batch_results[i]
+            original_item = fallback_items_queue[i]
+
+            est["display_name"] = original_item["item"].capitalize()
             final_nutrition_data.append(est)
 
     # Step 4: Aggregation - sum up total calories, protein, carbs, and fat for the whole meal
     meal_summary = {"calories": 0, "protein": 0, "carbs": 0, "fat": 0, "food_names": [], "has_estimates": False}
 
     for entry in final_nutrition_data:
+        print(f"Adding {entry['display_name']} - Calories: {entry['calories']}, Protein: {entry['protein']}, Carbs: {entry['carbs']}, Fat: {entry['fat']}, Estimated: {entry['estimated']}")
         # Keep track of food names and sum up macros for the whole meal
-        meal_summary["food_names"].append(entry["display_name"])
+        meal_summary["food_names"].append(entry.get("display_name", entry.get("food_name", "Unknown Item")))
         meal_summary["calories"] += entry.get("calories", 0)
         meal_summary["protein"] += entry.get("protein", 0)
         meal_summary["carbs"] += max(0, entry.get("carbs", 0)) # ensure carbs don't go negative due to rounding
@@ -283,9 +309,9 @@ def parse_meal(description: str) -> dict:
 
     return {
         "food_name": ", ".join(meal_summary["food_names"]),
-        "calories": meal_summary["calories"],
-        "protein": meal_summary["protein"],
+        "calories": round(meal_summary["calories"]),
+        "protein": round(meal_summary["protein"], 1),
         "carbs": round(max(0, meal_summary["carbs"]), 1),  # carbs can sometimes be negative due to rounding, so we ensure it's not below 0
-        "fat": meal_summary["fat"],
+        "fat": round(meal_summary["fat"], 1),
         "has_estimates": meal_summary["has_estimates"]
     }

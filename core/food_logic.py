@@ -27,12 +27,22 @@ def get_portion_in_grams(food_item: str, amount_str: str) -> float:
     value = float(match.group(1))
     unit = match.group(2)
 
+    # Handle cup logic separately based on density
+    if unit in ["cup", "cups"]:
+        if any(x in food_item.lower() for x in ["spinach", "kale", "lettuce", "broccoli", "cucumber", "cabbage"]):
+            unit_weight = 30.0  # 1 cup of leafy greens is about 30g
+        elif any(x in food_item.lower() for x in ["pasta", "cereal", "dry"]):
+            unit_weight = 100.0  # dry bulky items
+        elif any(x in food_item.lower() for x in ["rice", "flour", "sugar"]):
+            unit_weight = 150.0  # cooked rice/grains are denser
+        else:
+            unit_weight = 240.0  # default cup weight
+
     # Conversion mapping (standard weights in grams)
     conversions = {
         "oz": 28.35,
         "ounce": 28.35,
         "lb": 453.59,
-        "cup": 240.0,
         "tbsp": 15.0,
         "tsp": 5.0,
         "g": 1.0,
