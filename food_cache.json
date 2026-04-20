@@ -1,0 +1,29 @@
+{
+  "ground beef|200g": {
+    "food_name": "ground beef",
+    "calories": 500,
+    "protein": 52,
+    "carbs": 0,
+    "fat": 30,
+    "is_estimated": true,
+    "display_name": "Ground beef"
+  },
+  "hamburger bun|2slices": {
+    "food_name": "hamburger bun",
+    "calories": 150,
+    "protein": 5,
+    "carbs": 28,
+    "fat": 2,
+    "is_estimated": true,
+    "display_name": "Hamburger bun"
+  },
+  "cheddar cheese|2slices": {
+    "food_name": "cheddar cheese",
+    "calories": 220,
+    "protein": 14,
+    "carbs": 2,
+    "fat": 18,
+    "is_estimated": true,
+    "display_name": "Cheddar cheese"
+  }
+}

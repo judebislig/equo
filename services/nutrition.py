@@ -56,7 +56,6 @@ def parse_json_from_text(text: str) -> list | dict:
     """
     # 1. Clean up Markdown formatting if present
     text = text.replace("```json", "").replace("```", "").strip()
-
     decoder = json.JSONDecoder()
 
     for i, char in enumerate(text):
@@ -205,10 +204,19 @@ def is_usda_data_sane(food_name: str, macros_per_100g: dict) -> bool:
             print(f"USDA data for '{food_name}' exceeds {category} limit ({max_cals})")
             return False
     
-    # 4. Pure meat should not have much carbs
-    if any(x in name for x in ["chicken", "beef", "pork", "ham", "turkey", "sausage", "lamb"]) and macros_per_100g.get("carbs_per_100g", 0) > 10:
-        print(f"USDA data for '{food_name}' has too many carbs for a meat item")
-        return False
+    # 4. Meat check 
+    # We use a list that excludes "ham" for a moment to check for bread exclusion
+    meat_keywords = ["chicken", "beef", "pork", "ham", "turkey", "sausage", "lamb", "steak"]
+
+    # Add a negative check
+    if any(x in name for x in meat_keywords):
+        # check for bread items containing a meat word (e.g. hamburger)
+        if any(b in name for b in ["bun", "bread", "roll", "sandwich"]):
+            pass
+        
+        elif macros_per_100g.get("carbs_per_100g", 0) > 10:
+            print(f"USDA data for '{food_name}' has too many carbs for a meat item")
+            return False
 
     return True
 
