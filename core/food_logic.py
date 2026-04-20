@@ -5,10 +5,42 @@
 import re
 from thefuzz import fuzz
 
+# ==========================================
+# 1. HEURISTIC CONFIGURATIONS
+# ==========================================
+
+# Volume to weight (portion logic)
+DENSITY_MAP = {
+    "cup": [
+        (["spinach", "kale", "lettuce", "broccoli", "cucumber", "cabbage"], 30.0),  # leafy greens
+        (["pasta", "cereal", "dry"], 100.0),  # dry bulky items
+        (["rice", "flour", "sugar"], 150.0),  # cooked rice/grains are denser
+        ([], 240.0)  # default cup weight
+    ],
+    "portion": [
+        (["bread", "tortilla", "wrap", "bun", "bagel"], 80.0),  # bread-like items
+        (["egg"], 50.0),  # average large egg
+        ([], 100.0)  # default portion size in grams
+    ]
+}
+
+# Weight to calories (sanity logic) per 100g - these are upper bounds for sanity checks based on typical calorie densities of different food categories
+CALORIE_DENSITY_MAP = {
+    "leafy_greens": (["spinach", "kale", "lettuce", "broccoli", "cucumber", "cabbage"], 120), 
+    "starch_cooked": (["pasta", "rice", "quinoa", "potato", "oatmeal"], 200), 
+    "protein_lean": (["chicken breast", "turkey breast", "white fish"], 250),  
+    "eggs": (["egg"], 250)  
+}
+
+# USDA search ranking filters
 RED_FLAGS = ["spread", "beverage", "liquid", "baby food", "infant", "juice", 
     "drink", "flavor", "sauce", "powder", "mix", "cracker", "cake",
     "roll", "deli", "patty", "nugget"]
 PREMIUM_DATA_TYPES = ["SR Legacy", "Foundation"]  # prioritize these data types in USDA results
+
+# ==========================================
+# 2. CORE LOGIC FUNCTIONS
+# ==========================================
 
 def get_portion_in_grams(food_item: str, amount_str: str) -> float:
     """
@@ -52,6 +84,10 @@ def get_portion_in_grams(food_item: str, amount_str: str) -> float:
         "medium": 150.0,
         "large": 250.0
     }
+
+    if unit == "large":
+        if any(x in food_item.lower() for x in ["shake", "soft drink", "soda", "juice", "drink", "slushie", "smoothie"]):
+            return value * 500.0  # large beverage ~500g
 
     # Heuristic for unitless portions (like '0.5' for a tortilla)
     if not unit or unit == "portion":
