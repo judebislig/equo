@@ -25,7 +25,7 @@ DENSITY_MAP = {
 }
 
 # Weight to calories (sanity logic) per 100g - these are upper bounds for sanity checks based on typical calorie densities of different food categories
-CALORIE_DENSITY_MAP = {
+VALIDATION_MAP = {
     "leafy_greens": (["spinach", "kale", "lettuce", "broccoli", "cucumber", "cabbage"], 120), 
     "starch_cooked": (["pasta", "rice", "quinoa", "potato", "oatmeal"], 200), 
     "protein_lean": (["chicken breast", "turkey breast", "white fish"], 250),  
@@ -57,43 +57,29 @@ def get_portion_in_grams(food_item: str, amount_str: str) -> float:
         return 100.0  # default to 100g if we can't parse the amount
     
     value = float(match.group(1))
-    unit = match.group(2).rstrip("s")  # remove plural 's' for standardization
+    unit = match.group(2).rstrip("s")  # standardize unit to singular form
 
-    # Handle cup logic separately based on density
-    if unit in ["cup", "cups"]:
-        if any(x in food_item.lower() for x in ["spinach", "kale", "lettuce", "broccoli", "cucumber", "cabbage"]):
-            unit_weight = 30.0  # 1 cup of leafy greens is about 30g
-        elif any(x in food_item.lower() for x in ["pasta", "cereal", "dry"]):
-            unit_weight = 100.0  # dry bulky items
-        elif any(x in food_item.lower() for x in ["rice", "flour", "sugar"]):
-            unit_weight = 150.0  # cooked rice/grains are denser
-        else:
-            unit_weight = 240.0  # default cup weight
+    # Check density maps for cups/portions first, as they require more complex logic
+    if unit in ["cup", "portion", ""]:
+        key = unit if unit else "portion"
+        for keywords, weight in DENSITY_MAP.get(key, []):
+            if any(k in food_item.lower() for k in keywords):
+                return value * weight
+        
+        return value * (240.0 if unit == "cup" else 100.0)  # default weights for cup and portion
 
-    # Conversion mapping (standard weights in grams)
-    conversions = {
-        "oz": 28.35,
-        "ounce": 28.35,
-        "lb": 453.59,
-        "tbsp": 15.0,
-        "tsp": 5.0,
-        "g": 1.0,
-        "gram": 1.0,
-        "slice": 30.0, # Average bread slice
-        "small": 100.0,
-        "medium": 150.0,
-        "large": 250.0
-    }
-
+    # Special case for large beverages
     if unit == "large":
         if any(x in food_item.lower() for x in ["shake", "soft drink", "soda", "juice", "drink", "slushie", "smoothie"]):
             return value * 500.0  # large beverage ~500g
 
-    # Heuristic for unitless portions (like '0.5' for a tortilla)
-    if not unit or unit == "portion":
-        if any(keyword in food_item.lower() for keyword in ["bread", "tortilla", "wrap", "bun", "bagel"]):
-            return value * 80.0  # assume 80g per portion for bread-like items
-        return value * 100.0  # default portion size in grams
+    # Conversion mapping (standard weights in grams)
+    conversions = {
+        "oz": 28.35, "ounce": 28.35, "lb": 453.59, "tbsp": 15.0, 
+        "tsp": 5.0, "g": 1.0, "gram": 1.0, "slice": 30.0,
+        "small": 100.0, "medium": 150.0, "large": 250.0
+    }
+
     return value * conversions.get(unit, 100.0)  # default to 100g if unit is unrecognized
 
 def calculate_relevance_score(user_query: str, fdc_item: dict) -> float:
