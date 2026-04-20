@@ -43,7 +43,7 @@ def log_meal(meal: MealCreate, db: Session = Depends(get_db)):
         protein=parsed["protein"],
         carbs=parsed["carbs"],
         fat=parsed["fat"],
-        estimated=parsed["has_estimates"]   # store whether any item was estimated
+        is_estimated=parsed["is_estimated"]   # store whether any item was estimated
     )
     db.add(db_meal)
     db.commit()

@@ -3,6 +3,8 @@
 # Flow: natural language -> Gemini extracts items -> USDA looks up nutrition / LLM fallback -> return
 # Caching can be added later as an optimization
 
+import re
+
 import httpx
 import json
 import os
@@ -14,11 +16,38 @@ from google import genai
 USDA_API_KEY = os.getenv("USDA_API_KEY")
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 MODEL = "gemini-flash-latest"
+CACHE_FILE = "food_cache.json"  # simple JSON file for caching USDA results and LLM estimates
 DEBUG_MODE = False  # Set to True to enable debug mock functions instead of actual API calls
 
 # ==========================================
 # 1. UTILITIES & JSON HELPERS
 # ==========================================
+
+def load_cache():
+    """Load the cache from a JSON file, or return an empty dict if the file doesn't exist"""
+    if os.path.exists(CACHE_FILE):
+        try:
+            with open(CACHE_FILE, "r") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            print("Error loading cache file, starting with empty cache.")
+            return {}
+    return {}
+
+def save_cache(cache_data):
+    """Save the cache to a JSON file"""
+    try:
+        with open(CACHE_FILE, "w") as f:
+            json.dump(cache_data, f, indent=2)
+    except IOError as e:
+        print(f"Error saving cache file: {e}")
+
+def generate_cache_key(food_name: str, amount_str: str) -> str:
+    """Generate a unique cache key based on food name and amount string"""
+    item = food_name.lower().strip()
+    # Remove spaces and special characters between numbers and units for consistency (e.g., "100 g" -> "100g")
+    amount = re.sub(r'(\d+)\s+([a-zA-Z]+)', r'\1\2', amount_str.lower().strip())
+    return f"{item}|{amount}"
 
 def parse_json_from_text(text: str) -> list | dict:
     """
@@ -63,7 +92,7 @@ def mock_llm_fallback(food_name: str, amount: str) -> dict:
         "protein": 10,
         "carbs": 10,
         "fat": 2,
-        "estimated": True
+        "is_estimated": True
     }
 
 # ==========================================
@@ -94,8 +123,6 @@ def map_usda_to_macros(food_data: dict) -> dict:
     serving_size = food_data.get("servingSize")
 
     # If a serving size exists and isn't 100, normalize data back to 100g
-    # For example, if 740 cals is for a 200g wedge, normaliation_factor = 100/200 = 0.5
-    # 740 cals * 0.5 = 370 cals per 100g, which is more comparable to other items
     normalization_factor = 1.0
     if serving_size and serving_size > 0 and serving_size != 100:
         normalization_factor = 100.0 / serving_size
@@ -108,8 +135,10 @@ def map_usda_to_macros(food_data: dict) -> dict:
     }
 
 # ==========================================
-# 3. EXTERNAL CLIENTS (USDA & GEMINI)
+# 3. NUTRITION LOGIC & API WRAPPERS
 # ==========================================
+
+NUTRITION_CACHE = load_cache()  # Load cache at module level so it's available for all functions
 
 def nlp_extract_ingredients(description: str) -> list[dict]:
     """
@@ -120,10 +149,7 @@ def nlp_extract_ingredients(description: str) -> list[dict]:
         return mock_extract_ingredients(description)
 
     prompt = EXTRACT_FOOD_ITEMS_PROMPT.format(description=description)
-    response = client.models.generate_content(
-        model=MODEL,
-        contents=prompt
-    )
+    response = client.models.generate_content(model=MODEL,contents=prompt)
     data = parse_json_from_text(response.text)
     items = data.get("items", [])
 
@@ -136,8 +162,7 @@ def estimate_nutrition_batch(items: list[dict]) -> list[dict]:
     """
     Takes a list of items that failed USDA lookup and estimates nutrition for each using a single Gemini request
     """
-    if not items:
-        return []
+    if not items: return []
     
     if DEBUG_MODE:
         print(f"Mock estimating nutrition for batch: {items}")
@@ -146,27 +171,21 @@ def estimate_nutrition_batch(items: list[dict]) -> list[dict]:
     # Real LLM logic
     # We send the entire batch of items in one prompt to Gemini, which should be more efficient than multiple calls
     items_json = json.dumps(items)
-    print(items_json)
-
     prompt = LLM_FALLBACK_PROMPT.format(count=len(items), items_json=items_json)
     response = client.models.generate_content(model=MODEL, contents=prompt)
 
     # Extract JSON array of nutrition estimates from the response
     results = parse_json_from_text(response.text)
 
-    print(f"Items - {items}")
-    print(f"Results - {results}")
-
     if isinstance(results, dict):
         results = [results]  # ensure it's always a list
 
     for r in results:
-        r["estimated"] = True  # mark these as estimates
+        r["is_estimated"] = True  # mark these as estimates
 
     return results
 
 def is_usda_data_sane(food_name: str, macros_per_100g: dict) -> bool:
-    print(f"Sanity checking USDA data for '{food_name}': {macros_per_100g} kcal per 100g")
     name = food_name.lower()
     cals = macros_per_100g["calories_per_100g"]
 
@@ -183,11 +202,12 @@ def is_usda_data_sane(food_name: str, macros_per_100g: dict) -> bool:
     # 3. Category-specific checks based on known validation rules
     for category, (keywords, max_cals) in VALIDATION_MAP.items():
         if any(k in name for k in keywords) and cals > max_cals:
-            print(f"{food_name} exceeds {category} limit ({max_cals})")
+            print(f"USDA data for '{food_name}' exceeds {category} limit ({max_cals})")
             return False
     
     # 4. Pure meat should not have much carbs
     if any(x in name for x in ["chicken", "beef", "pork", "ham", "turkey", "sausage", "lamb"]) and macros_per_100g.get("carbs_per_100g", 0) > 10:
+        print(f"USDA data for '{food_name}' has too many carbs for a meat item")
         return False
 
     return True
@@ -231,13 +251,11 @@ def call_usda_api(food_name: str, amount_str: str) -> dict | None:
         # 3. Scale macros based on portion
         base_macros = map_usda_to_macros(best_match)
 
-        if not is_usda_data_sane(food_name, base_macros):
-            print(f"USDA data for '{food_name}' failed sanity check, skipping to LLM fallback")
+        if not is_usda_data_sane(food_name, base_macros): 
             return None
 
-        gram_weight = get_portion_in_grams(food_name, amount_str)
-
         # USDA data is per 100g, so calculate scaling factor
+        gram_weight = get_portion_in_grams(food_name, amount_str)
         multiplier = gram_weight / 100.0
 
         # Return standardized nutrition info - calories, protein, carbs, fat
@@ -247,7 +265,7 @@ def call_usda_api(food_name: str, amount_str: str) -> dict | None:
             "protein": round(base_macros["protein_per_100g"] * multiplier, 2),
             "carbs": round(base_macros["carbs_per_100g"] * multiplier, 2),
             "fat": round(base_macros["fat_per_100g"] * multiplier, 2),
-            "estimated": False  # indicates this is an exact USDA data
+            "is_estimated": False  # indicates this is an exact USDA data
         }
     except Exception as e:
         print(f"USDA API error for '{food_name}': {e}")
@@ -266,17 +284,28 @@ def parse_meal(description: str) -> dict:
     4. Sum total calories, protein, carbs, and fat for the meal
 
     Input example: "chicken breast with rice and broccoli"
-    Output example: {"food_name": "chicken breast, rice, broccoli", "calories": 600, "protein": 50, "carbs": 60, "fat": 10, "has_estimates": False}
+    Output example: {"food_name": "chicken breast, rice, broccoli", "calories": 600, "protein": 50, "carbs": 60, "fat": 10, "is_estimated": False}
     """
     # Step 1: Extract food items and amounts using Gemini
     food_items = nlp_extract_ingredients(description)
     print(f"Extracted food items: {food_items}")
 
     final_nutrition_data = []
+    items_to_lookup = []  # keep track of items we need to look up in USDA
     fallback_items_queue = []
 
-    # Step 2: Get nutrition for each item, using USDA or LLM fallback
+    # Step 2: Check cache first for each item before calling USDA
     for item in food_items:
+        key = generate_cache_key(item["item"], item["amount"])
+        if key in NUTRITION_CACHE:
+            print(f"Cache hit for {key}")
+            final_nutrition_data.append(NUTRITION_CACHE[key])
+        else:
+            print(f"Cache miss for {key}, adding to USDA lookup queue")
+            items_to_lookup.append(item)
+
+    # Step 3: For items not in cache, call USDA API to get nutrition info
+    for item in items_to_lookup:
         # Get nutrition info for this item and amount, including food name, calories, protein, carbs, fat, and whether it was an estimate
         usda_nutrition = call_usda_api(item["item"], item["amount"])
     
@@ -285,11 +314,14 @@ def parse_meal(description: str) -> dict:
             usda_nutrition["display_name"] = item["item"].capitalize()
             final_nutrition_data.append(usda_nutrition)
 
+            key = generate_cache_key(item["item"], item["amount"])
+            NUTRITION_CACHE[key] = usda_nutrition  # Cache the USDA result for future use
+
         else:
             # If failed USDA or hit the 950 calorie sanity check, add to LLM batch list
             fallback_items_queue.append(item)
 
-    # Step 3: The batch fallback to LLM for any items that failed USDA lookup or had poor matches
+    # Step 4: The batch fallback to LLM for any items that failed USDA lookup or had poor matches
     if fallback_items_queue:
         print(f"Batch LLM fallback for items: {fallback_items_queue}")
         batch_results = estimate_nutrition_batch(fallback_items_queue)
@@ -301,11 +333,16 @@ def parse_meal(description: str) -> dict:
             est["display_name"] = original_item["item"].capitalize()
             final_nutrition_data.append(est)
 
-    # Step 4: Aggregation - sum up total calories, protein, carbs, and fat for the whole meal
-    meal_summary = {"calories": 0, "protein": 0, "carbs": 0, "fat": 0, "food_names": [], "has_estimates": False}
+            key = generate_cache_key(original_item["item"], original_item["amount"])
+            NUTRITION_CACHE[key] = est  # Cache the LLM estimate for future use
+
+    save_cache(NUTRITION_CACHE)  # Save cache after processing all items
+
+    # Step 5: Aggregation - sum up total calories, protein, carbs, and fat for the whole meal
+    meal_summary = {"calories": 0, "protein": 0, "carbs": 0, "fat": 0, "food_names": [], "is_estimated": False}
 
     for entry in final_nutrition_data:
-        print(f"Adding {entry['display_name']} - Calories: {entry['calories']}, Protein: {entry['protein']}, Carbs: {entry['carbs']}, Fat: {entry['fat']}, Estimated: {entry['estimated']}")
+        print(f"Adding {entry['display_name']} - Calories: {entry['calories']}, Protein: {entry['protein']}, Carbs: {entry['carbs']}, Fat: {entry['fat']}, Estimated: {entry['is_estimated']}")
         # Keep track of food names and sum up macros for the whole meal
         meal_summary["food_names"].append(entry.get("display_name", entry.get("food_name", "Unknown Item")))
         meal_summary["calories"] += entry.get("calories", 0)
@@ -314,8 +351,8 @@ def parse_meal(description: str) -> dict:
         meal_summary["fat"] += entry.get("fat", 0)
 
         # If any item was estimated, mark the whole meal as having estimates
-        if entry.get("estimated"):
-            meal_summary["has_estimates"] = True
+        if entry.get("is_estimated"):
+            meal_summary["is_estimated"] = True
 
     return {
         "food_name": ", ".join(meal_summary["food_names"]),
@@ -323,5 +360,5 @@ def parse_meal(description: str) -> dict:
         "protein": round(meal_summary["protein"], 1),
         "carbs": round(max(0, meal_summary["carbs"]), 1),  # carbs can sometimes be negative due to rounding, so we ensure it's not below 0
         "fat": round(meal_summary["fat"], 1),
-        "has_estimates": meal_summary["has_estimates"]
+        "is_estimated": meal_summary["is_estimated"]
     }
