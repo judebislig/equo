@@ -36,15 +36,25 @@ Meal: "{description}"
 """
 
 LLM_FALLBACK_PROMPT = """
-Estimate nutrition for each of these items INDIVIDUALLY: {items_list}
-Return a JSON array with EXACTLY {count} objects. 
-Do not combine items.
+ACT AS A NUTRITION DATA API.
+Your task is to return a JSON ARRAY of nutrition estimates.
 
-RULES:
-- Use standard USDA-style estimates.
-- Assumptions: 1 slice cheese (20g), 1 slice bread (30g), 1 cup rice (200g).
-- Defaults: cheese=cheddar, bread=white, rice=white, meat=cooked/unbreaded.
-- Return ONLY a JSON array of objects.
+CRITICAL REQUIREMENT: 
+You must return exactly {count} objects in the array. 
+One for each item in this list: {items_json}
 
-JSON Keys: "food_name", "calories", "protein", "carbs", "fat"
+STRICT JSON SCHEMA:
+[
+  {{
+    "food_name": "string",
+    "calories": number,
+    "protein": number,
+    "carbs": number,
+    "fat": number
+  }}
+]
+
+DO NOT include any conversational text. 
+DO NOT include Markdown formatting (no ```json).
+ONLY return the raw JSON array.
 """

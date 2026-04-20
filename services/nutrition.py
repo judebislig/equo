@@ -6,7 +6,7 @@
 import httpx
 import json
 import os
-from core.food_logic import get_portion_in_grams, calculate_relevance_score
+from core.food_logic import get_portion_in_grams, calculate_relevance_score, validate_macro_logic
 from services.prompts import EXTRACT_FOOD_ITEMS_PROMPT, LLM_FALLBACK_PROMPT
 from google import genai
 
@@ -20,21 +20,26 @@ DEBUG_MODE = False  # Set to True to enable debug mock functions instead of actu
 # 1. UTILITIES & JSON HELPERS
 # ==========================================
 
-def parse_json_from_text(text: str) -> dict:
+def parse_json_from_text(text: str) -> list | dict:
     """
-    Helper function to extract JSON from Gemini response text
+    Improved parser that handles both JSON Arrays [] and Objects {} 
+    while stripping Markdown code blocks.
     """
+    # 1. Clean up Markdown formatting if present
+    text = text.replace("```json", "").replace("```", "").strip()
+
     decoder = json.JSONDecoder()
 
     for i, char in enumerate(text):
-        if char == "{":
+        # Look for the start of an Array OR an Object
+        if char in ("{", "["):
             try:
                 obj, _ = decoder.raw_decode(text[i:])
                 return obj
             except json.JSONDecodeError:
                 continue
 
-    raise ValueError("No JSON object found in the text")
+    raise ValueError(f"No JSON object or array found in the text: {text[:100]}...")
 
 def mock_extract_ingredients(description: str) -> list[dict]:
     """
@@ -139,14 +144,18 @@ def estimate_nutrition_batch(items: list[dict]) -> list[dict]:
         return [mock_llm_fallback(i["item"], i["amount"]) for i in items]
     
     # Real LLM logic
-    # Convert list to a readable string for this prompt
-    items_description = ", ".join([f"{i['amount']} of {i['item']}" for i in items])
+    # We send the entire batch of items in one prompt to Gemini, which should be more efficient than multiple calls
+    items_json = json.dumps(items)
+    print(items_json)
 
-    prompt = LLM_FALLBACK_PROMPT.format(items_list=items_description, count=len(items))
+    prompt = LLM_FALLBACK_PROMPT.format(count=len(items), items_json=items_json)
     response = client.models.generate_content(model=MODEL, contents=prompt)
 
     # Extract JSON array of nutrition estimates from the response
     results = parse_json_from_text(response.text)
+
+    print(f"Items - {items}")
+    print(f"Results - {results}")
 
     if isinstance(results, dict):
         results = [results]  # ensure it's always a list
@@ -161,6 +170,11 @@ def is_usda_data_sane(food_name: str, macros_per_100g: dict) -> bool:
     name = food_name.lower()
     cals = macros_per_100g["calories_per_100g"]
 
+    # Check Atwater math
+    if not validate_macro_logic(macros_per_100g):
+        print(f"USDA data for '{food_name}' failed Atwater calorie validation for {food_name}")
+        return False
+
     # Example sanity check: pure fat is 900kcal/100g. If the base is higher than 950,
     # the USDA entry is likely using a non-standard unit (like 'per pound')
     if cals > 950:
@@ -168,7 +182,7 @@ def is_usda_data_sane(food_name: str, macros_per_100g: dict) -> bool:
         return False
     
     # Leafy greens or very low-calorie items should not have high calories per 100g
-    if any(x in name for x in ["spinach", "kale", "lettuce", "broccoli", "cucumber", "cabbage"]) and cals > 50:
+    if any(x in name for x in ["spinach", "kale", "lettuce", "broccoli", "cucumber", "cabbage"]) and cals > 120:
         return False
     
     # Pure meat should not have much carbs

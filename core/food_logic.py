@@ -25,7 +25,7 @@ def get_portion_in_grams(food_item: str, amount_str: str) -> float:
         return 100.0  # default to 100g if we can't parse the amount
     
     value = float(match.group(1))
-    unit = match.group(2)
+    unit = match.group(2).rstrip("s")  # remove plural 's' for standardization
 
     # Handle cup logic separately based on density
     if unit in ["cup", "cups"]:
@@ -82,3 +82,32 @@ def calculate_relevance_score(user_query: str, fdc_item: dict) -> float:
         score += 20  # arbitrary bonus for premium data types
 
     return score
+
+def validate_macro_logic(macros: dict) -> bool:
+    """
+    Uses the Atwater System to validate that the calories reported for a food item are consistent with its macronutrient breakdown
+    Returns True if the calories are within a reasonable range of the calculated value, False otherwise
+    """
+    reported_calories = macros["calories_per_100g"]
+    if reported_calories <= 0:
+        return False
+    
+    # Atwater factors
+    FAT_KCAL = 9
+    PROTEIN_KCAL = 4
+    CARB_KCAL = 4
+
+    calculated_cals = (
+        (macros.get("fat_per_100g", 0) * FAT_KCAL) +
+        (macros.get("protein_per_100g", 0) * PROTEIN_KCAL) +
+        (macros.get("carbs_per_100g", 0) * CARB_KCAL)
+    )
+
+    # Allow for a 20% margin of error in the calorie count
+    discrepancy = abs(calculated_cals - reported_calories)
+    margin = reported_calories * 0.20
+
+    if discrepancy > margin:
+        return False
+    
+    return True
