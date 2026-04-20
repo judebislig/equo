@@ -53,8 +53,7 @@ def get_portion_in_grams(food_item: str, amount_str: str) -> float:
 
     # Extract number and unit using regex
     match = re.search(r"([0-9.]+)\s*([a-zA-Z]*)", amount_str)
-    if not match:
-        return 100.0  # default to 100g if we can't parse the amount
+    if not match: return 100.0  # default 
     
     value = float(match.group(1))
     unit = match.group(2).rstrip("s")  # standardize unit to singular form
@@ -82,6 +81,21 @@ def get_portion_in_grams(food_item: str, amount_str: str) -> float:
 
     return value * conversions.get(unit, 100.0)  # default to 100g if unit is unrecognized
 
+def calculate_atwater_calories(macros: dict) -> float:
+    """Pure math: (fat * 9) + (protein * 4) + (carbs * 4)"""
+    return (macros.get("fat_per_100g", 0) * 9) + (macros.get("protein_per_100g", 0) * 4) + (macros.get("carbs_per_100g", 0) * 4)
+
+def validate_macro_logic(macros: dict) -> bool:
+    """
+    Uses the Atwater System to validate that the calories reported for a food item are consistent with its macronutrient breakdown
+    Returns True if the calories are within a reasonable range of the calculated value, False otherwise
+    """
+    reported_calories = macros.get("calories_per_100g", 0)
+    if reported_calories <= 0: return False
+
+    expected = calculate_atwater_calories(macros)
+    return abs(expected - reported_calories) <= (reported_calories * 0.25)  # allow 25% margin of error due to rounding
+
 def calculate_relevance_score(user_query: str, fdc_item: dict) -> float:
     """
     Calculates a relevance score for a USDA food item based on the user's query
@@ -97,39 +111,10 @@ def calculate_relevance_score(user_query: str, fdc_item: dict) -> float:
     # 2. Penalize if any red flag words are present in the description
     for flag in RED_FLAGS:
         if flag in usda_description and flag not in user_query:
-            score -= 50  # arbitrary penalty for red flags
+            score -= 50  
 
     # 3. Bonus: Reliable data sources (Foundation foods are better than branded)
     if fdc_item.get("dataType") in PREMIUM_DATA_TYPES:
-        score += 20  # arbitrary bonus for premium data types
+        score += 20  
 
     return score
-
-def validate_macro_logic(macros: dict) -> bool:
-    """
-    Uses the Atwater System to validate that the calories reported for a food item are consistent with its macronutrient breakdown
-    Returns True if the calories are within a reasonable range of the calculated value, False otherwise
-    """
-    reported_calories = macros["calories_per_100g"]
-    if reported_calories <= 0:
-        return False
-    
-    # Atwater factors
-    FAT_KCAL = 9
-    PROTEIN_KCAL = 4
-    CARB_KCAL = 4
-
-    calculated_cals = (
-        (macros.get("fat_per_100g", 0) * FAT_KCAL) +
-        (macros.get("protein_per_100g", 0) * PROTEIN_KCAL) +
-        (macros.get("carbs_per_100g", 0) * CARB_KCAL)
-    )
-
-    # Allow for a 20% margin of error in the calorie count
-    discrepancy = abs(calculated_cals - reported_calories)
-    margin = reported_calories * 0.20
-
-    if discrepancy > margin:
-        return False
-    
-    return True

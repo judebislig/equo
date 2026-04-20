@@ -6,7 +6,7 @@
 import httpx
 import json
 import os
-from core.food_logic import get_portion_in_grams, calculate_relevance_score, validate_macro_logic
+from core.food_logic import get_portion_in_grams, calculate_relevance_score, validate_macro_logic, VALIDATION_MAP
 from services.prompts import EXTRACT_FOOD_ITEMS_PROMPT, LLM_FALLBACK_PROMPT
 from google import genai
 
@@ -170,28 +170,24 @@ def is_usda_data_sane(food_name: str, macros_per_100g: dict) -> bool:
     name = food_name.lower()
     cals = macros_per_100g["calories_per_100g"]
 
-    # Check Atwater math
+    # 1. Check Atwater math
     if not validate_macro_logic(macros_per_100g):
         print(f"USDA data for '{food_name}' failed Atwater calorie validation for {food_name}")
         return False
 
-    # Example sanity check: pure fat is 900kcal/100g. If the base is higher than 950,
-    # the USDA entry is likely using a non-standard unit (like 'per pound')
+    # 2. Hard cap - pure fat limit
     if cals > 950:
         print(f"USDA data for '{food_name}' has unusually high calories ({macros_per_100g} kcal), likely due to non-standard serving size.")
         return False
     
-    # Leafy greens or very low-calorie items should not have high calories per 100g
-    if any(x in name for x in ["spinach", "kale", "lettuce", "broccoli", "cucumber", "cabbage"]) and cals > 120:
-        return False
+    # 3. Category-specific checks based on known validation rules
+    for category, (keywords, max_cals) in VALIDATION_MAP.items():
+        if any(k in name for k in keywords) and cals > max_cals:
+            print(f"{food_name} exceeds {category} limit ({max_cals})")
+            return False
     
-    # Pure meat should not have much carbs
+    # 4. Pure meat should not have much carbs
     if any(x in name for x in ["chicken", "beef", "pork", "ham", "turkey", "sausage", "lamb"]) and macros_per_100g.get("carbs_per_100g", 0) > 10:
-        return False
-
-    # Dry pasta check
-    if "pasta" in name and cals > 400:
-        print(f"USDA data for '{food_name}' has unusually high calories ({macros_per_100g} kcal), likely due to being dry pasta. This can be misleading for users who typically eat cooked pasta.")
         return False
 
     return True
