@@ -24,6 +24,6 @@ class Meal(Base):
     carbs: Mapped[float] = mapped_column()
     fat: Mapped[float] = mapped_column()
 
-    estimated: Mapped[bool] = mapped_column(default=False)  # True if macros came from LLM fallback
+    is_estimated: Mapped[bool] = mapped_column(default=False)  # True if macros came from LLM fallback
 
     logged_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)

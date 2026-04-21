@@ -24,7 +24,7 @@ class MealResponse(BaseModel):
     protein: float      # Gemini estimated
     carbs: float        # Gemini estimated
     fat: float          # Gemini estimated
-    estimated: bool = False
+    is_estimated: bool = False
     logged_at: Optional[datetime] = None  
 
     class Config:
