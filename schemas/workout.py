@@ -5,11 +5,12 @@
 from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
+from core.enums import ActivityType
 
 # Shape of the incoming request body when creating a new workout
 class WorkoutCreate(BaseModel):
     user_id: int
-    activity_type: str
+    activity_type: ActivityType
     duration_minutes: int = Field(gt=0)
     calories_override: Optional[float] = None
     notes: Optional[str] = Field(None, max_length=500)
@@ -18,7 +19,7 @@ class WorkoutCreate(BaseModel):
 class WorkoutResponse(BaseModel):
     id: int
     user_id: int
-    activity_type: str
+    activity_type: ActivityType
     duration_minutes: int
     calories_burned: float
     is_estimated: bool = True
