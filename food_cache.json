@@ -8,15 +8,6 @@
     "is_estimated": true,
     "display_name": "Ground beef"
   },
-  "hamburger bun|2slices": {
-    "food_name": "hamburger bun",
-    "calories": 150,
-    "protein": 5,
-    "carbs": 28,
-    "fat": 2,
-    "is_estimated": true,
-    "display_name": "Hamburger bun"
-  },
   "cheddar cheese|2slices": {
     "food_name": "cheddar cheese",
     "calories": 220,

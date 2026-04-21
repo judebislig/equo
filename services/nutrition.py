@@ -4,7 +4,6 @@
 # Caching can be added later as an optimization
 
 import re
-
 import httpx
 import json
 import os
@@ -149,8 +148,7 @@ def nlp_extract_ingredients(description: str) -> list[dict]:
 
     prompt = EXTRACT_FOOD_ITEMS_PROMPT.format(description=description)
     response = client.models.generate_content(model=MODEL,contents=prompt)
-    data = parse_json_from_text(response.text)
-    items = data.get("items", [])
+    items = parse_json_from_text(response.text).get("items", [])
 
     if isinstance(items, dict):
         items = [items]  # ensure it's always a list
@@ -206,15 +204,15 @@ def is_usda_data_sane(food_name: str, macros_per_100g: dict) -> bool:
     
     # 4. Meat check 
     # We use a list that excludes "ham" for a moment to check for bread exclusion
-    meat_keywords = ["chicken", "beef", "pork", "ham", "turkey", "sausage", "lamb", "steak"]
+    meat_keywords = ["chicken", "beef", "pork", "turkey", "sausage", "lamb", "steak"]
 
-    # Add a negative check
-    if any(x in name for x in meat_keywords):
+    is_meat_item = any(x in name for x in meat_keywords) or re.search(r'\bham\b', name)
+
+    if is_meat_item:
         # check for bread items containing a meat word (e.g. hamburger)
-        if any(b in name for b in ["bun", "bread", "roll", "sandwich"]):
-            pass
-        
-        elif macros_per_100g.get("carbs_per_100g", 0) > 10:
+        is_bread = any(b in name for b in ["bun", "bread", "roll", "crust", "muffin"])
+
+        if not is_bread and macros_per_100g.get("carbs_per_100g", 0) > 12:
             print(f"USDA data for '{food_name}' has too many carbs for a meat item")
             return False
 
@@ -263,8 +261,7 @@ def call_usda_api(food_name: str, amount_str: str) -> dict | None:
             return None
 
         # USDA data is per 100g, so calculate scaling factor
-        gram_weight = get_portion_in_grams(food_name, amount_str)
-        multiplier = gram_weight / 100.0
+        multiplier = get_portion_in_grams(food_name, amount_str) / 100.0
 
         # Return standardized nutrition info - calories, protein, carbs, fat
         return {
@@ -326,7 +323,7 @@ def parse_meal(description: str) -> dict:
             NUTRITION_CACHE[key] = usda_nutrition  # Cache the USDA result for future use
 
         else:
-            # If failed USDA or hit the 950 calorie sanity check, add to LLM batch list
+            # If failed USDA or hit the calorie sanity checks, add to LLM batch list
             fallback_items_queue.append(item)
 
     # Step 4: The batch fallback to LLM for any items that failed USDA lookup or had poor matches
@@ -366,7 +363,7 @@ def parse_meal(description: str) -> dict:
         "food_name": ", ".join(meal_summary["food_names"]),
         "calories": round(meal_summary["calories"]),
         "protein": round(meal_summary["protein"], 1),
-        "carbs": round(max(0, meal_summary["carbs"]), 1),  # carbs can sometimes be negative due to rounding, so we ensure it's not below 0
+        "carbs": round(max(0, meal_summary["carbs"]), 1), 
         "fat": round(meal_summary["fat"], 1),
         "is_estimated": meal_summary["is_estimated"]
     }

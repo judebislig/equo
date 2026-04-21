@@ -36,6 +36,7 @@ VALIDATION_MAP = {
 RED_FLAGS = ["spread", "beverage", "liquid", "baby food", "infant", "juice", 
     "drink", "flavor", "sauce", "powder", "mix", "cracker", "cake",
     "roll", "deli", "patty", "nugget"]
+
 PREMIUM_DATA_TYPES = ["SR Legacy", "Foundation"]  # prioritize these data types in USDA results
 
 # ==========================================
