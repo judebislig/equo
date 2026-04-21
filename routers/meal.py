@@ -1,5 +1,5 @@
 # routers/meal.py
-# Defines all API endpoints related to users
+# Defines all API endpoints related to meals
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, cast, Date

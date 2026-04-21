@@ -1,5 +1,5 @@
 # models/workout.py
-# SQLAlchemy model that defines the users table in PostgreSQL - turns Python object into SQLAlchemy object that can be translated to database (ORM)
+# SQLAlchemy model that defines the workouts table in PostgreSQL - turns Python object into SQLAlchemy object that can be translated to database (ORM)
 # This is NOT a Pydantic schema - it maps directly to a database table
 
 from sqlalchemy import ForeignKey

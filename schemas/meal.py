@@ -1,6 +1,6 @@
 # schemas/meal.py
-# Pydantic models that define shape of API requests and responses for users - turns data into Python object
-# SQLAlchemy models (models/user.py) define the actual database table
+# Pydantic models that define shape of API requests and responses for meals - turns data into Python object
+# SQLAlchemy models (models/meal.py) define the actual database table
 
 from pydantic import BaseModel
 from typing import Optional
