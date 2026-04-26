@@ -1,0 +1,2 @@
+- Weight target for users, can change the offset needed for cut or bulk
+- LLM to determine what to eat the rest of the day

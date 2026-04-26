@@ -39,6 +39,13 @@ RED_FLAGS = ["spread", "beverage", "liquid", "baby food", "infant", "juice",
 
 PREMIUM_DATA_TYPES = ["SR Legacy", "Foundation"]  # prioritize these data types in USDA results
 
+# Used for call_usda_api. If a brand is detected, skip to LLM fallback
+BRAND_NAMES = [
+    "mcdonalds", "mcdonald's", "burger king", "wendys", "wendy's",
+    "subway", "chipotle", "taco bell", "kfc", "chick-fil-a",
+    "popeyes", "five guys", "shake shack", "in-n-out"
+]
+
 # ==========================================
 # 2. CORE LOGIC FUNCTIONS
 # ==========================================
@@ -119,3 +126,11 @@ def calculate_relevance_score(user_query: str, fdc_item: dict) -> float:
         score += 20  
 
     return score
+
+def is_branded_food(food_name: str) -> bool:
+    """
+    Returns True if food name contains a known fast food brand.
+    These items won't be in USDA Foundation/SR Legacy - skip straight to LLM
+    """
+    name_lower = food_name.lower()
+    return any(brand in name_lower for brand in BRAND_NAMES)

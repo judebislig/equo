@@ -18,7 +18,7 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     Returns the created user object
     """
     # Calculate target before saving
-    target = get_initial_calorie_target(user.weight, user.height, user.sex, user.goal)
+    target = get_initial_calorie_target(user.weight, user.height, user.age, user.sex, user.goal)
 
     # New SQLAlchemy User object from validated Python object (from Pydantic)
     db_user = User(

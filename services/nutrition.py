@@ -7,7 +7,7 @@ import re
 import httpx
 import json
 import os
-from core.food_logic import get_portion_in_grams, calculate_relevance_score, validate_macro_logic, VALIDATION_MAP
+from core.food_logic import get_portion_in_grams, calculate_relevance_score, validate_macro_logic, VALIDATION_MAP, is_branded_food
 from services.prompts import EXTRACT_FOOD_ITEMS_PROMPT, LLM_FALLBACK_PROMPT
 from google import genai
 
@@ -224,6 +224,12 @@ def call_usda_api(food_name: str, amount_str: str) -> dict | None:
     Implements relevance scoring to find the best match and scales nutrition based on portion size
     Returns a dict with standardized nutrition info or None if no good match is found
     """
+    
+    # Skip USDA entirely for branded foods
+    if is_branded_food(food_name):
+        print(f"Branded food detected: '{food_name}' — skipping USDA, going to LLM")
+        return None
+    
     url = "https://api.nal.usda.gov/fdc/v1/foods/search"
     params = {
         "query": food_name,

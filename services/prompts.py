@@ -13,6 +13,11 @@ IMPORTANT RULES:
 - Preserve the original food as closely as possible
 - Prefer simple, generic food names (e.g., "white rice", "grilled chicken", "cheddar cheese")
 - Avoid brand names unless explicitly mentioned
+- Treat fast food items as single items, not their components
+  Example: "mcdonalds chicken nuggets" → {{"item": "mcdonalds chicken nuggets 10 piece", "amount": "10 piece"}}
+  NOT: chicken + breading as separate items
+- Keep brand names when present — they help with lookup accuracy
+- If an item has a clear quantity, include it in the amount field
 
 PORTIONS:
 - If a quantity is given, use it exactly (e.g., "2 slices", "12 oz")

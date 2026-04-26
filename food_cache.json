@@ -115,5 +115,77 @@
     "fat": 11.5,
     "is_estimated": true,
     "display_name": "Butter"
+  },
+  "breading|10piece": {
+    "food_name": "Bread, egg",
+    "calories": 2870.0,
+    "protein": 95.0,
+    "carbs": 478.0,
+    "fat": 60.0,
+    "is_estimated": false,
+    "display_name": "Breading"
+  },
+  "chicken|10piece": {
+    "food_name": "chicken",
+    "calories": 480,
+    "protein": 25,
+    "carbs": 22,
+    "fat": 31,
+    "is_estimated": true,
+    "display_name": "Chicken"
+  },
+  "mcdonalds chicken nuggets|10piece": {
+    "food_name": "mcdonalds chicken nuggets",
+    "calories": 410,
+    "protein": 23,
+    "carbs": 25,
+    "fat": 24,
+    "is_estimated": true,
+    "display_name": "Mcdonalds chicken nuggets"
+  },
+  "burger king big mac|1burger": {
+    "food_name": "BURGER KING, Hamburger",
+    "calories": 261.0,
+    "protein": 14.8,
+    "carbs": 26.8,
+    "fat": 10.6,
+    "is_estimated": false,
+    "display_name": "Burger king big mac"
+  },
+  "burger king fries|1cup": {
+    "food_name": "burger king fries",
+    "calories": 280,
+    "protein": 3.5,
+    "carbs": 38,
+    "fat": 14,
+    "is_estimated": true,
+    "display_name": "Burger king fries"
+  },
+  "mcdonalds fries|1cup": {
+    "food_name": "McDONALD'S, french fries",
+    "calories": 775.2,
+    "protein": 8.18,
+    "carbs": 102.24,
+    "fat": 37.2,
+    "is_estimated": false,
+    "display_name": "Mcdonalds fries"
+  },
+  "mcdonalds big mac|1": {
+    "food_name": "mcdonalds big mac",
+    "calories": 563,
+    "protein": 26,
+    "carbs": 45,
+    "fat": 33,
+    "is_estimated": true,
+    "display_name": "Mcdonalds big mac"
+  },
+  "burger king whopper|1": {
+    "food_name": "burger king whopper",
+    "calories": 670,
+    "protein": 28,
+    "carbs": 50,
+    "fat": 37,
+    "is_estimated": true,
+    "display_name": "Burger king whopper"
   }
 }
