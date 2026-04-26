@@ -86,3 +86,19 @@ def get_workout_history(user_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail=f"No workouts found for user {user_id}")
 
     return workouts
+
+@router.delete("/{workout_id}")
+def delete_workout(workout_id: int, db: Session = Depends(get_db)):
+    """
+    Delete a workout given its id
+    Returns a success message if deleted, or 404 if workout not found
+    """
+    db_workout = db.query(Workout).filter(Workout.id == workout_id).first()
+
+    if not db_workout:
+        raise HTTPException(status_code=404, detail=f"Workout {workout_id} not found")
+    
+    db.delete(db_workout)
+    db.commit()
+
+    return {"message": f"Workout {workout_id} deleted successfully"}
