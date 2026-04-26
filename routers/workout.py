@@ -3,6 +3,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException
 from models.user import User
+from services.activity_calories import calculate_calories_burned
 from sqlalchemy import func, cast, Date
 from sqlalchemy.orm import Session
 from database import get_db
@@ -28,5 +29,23 @@ def log_workout(workout: WorkoutCreate, db: Session = Depends(get_db)):
     # Calculate calories - uses override if provided, otherwise MET formula
     weight_kg = db_user.weight or 70.0 # default 70kg if weight is not set
     calories, is_estimated = calculate_calories_burned(
-        
+        activity_type=workout.activity_type,
+        duration_minutes=workout.duration_minutes,
+        weight_kg=weight_kg,
+        calories_override=workout.calories_override
     )
+
+    # Create workout record combining user input and calculated calories
+    db_workout = Workout(
+        user_id=workout.user_id,
+        activity_type=workout.activity_type,
+        duration_minutes=workout.duration_minutes,
+        calories_burned=calories,
+        is_estimated=is_estimated,
+        notes=workout.notes
+    )
+
+    db.add(db_workout)
+    db.commit()
+    db.refresh(db_workout)
+    return db_workout
