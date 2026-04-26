@@ -5,9 +5,10 @@
 from fastapi import FastAPI
 from database import engine, Base
 from dotenv import load_dotenv
-from routers import user, meal
+from routers import user, meal, workout
 import models.user
 import models.meal
+import models.workout
 
 # Load environment variables from .env file
 # Makes DATABASE_URL, ANTHROPIC_API_KEY, etc available to all modules
@@ -24,5 +25,6 @@ def root():
 
 app.include_router(user.router, prefix="/users", tags=["users"])
 app.include_router(meal.router, prefix="/meals", tags=["meals"])
+app.include_router(workout.router, prefix="/workouts", tags=["workouts"])
 
     
