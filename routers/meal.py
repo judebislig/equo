@@ -66,7 +66,7 @@ def get_todays_meals(user_id: int, db: Session = Depends(get_db)):
     meals = db.query(Meal).filter(
         Meal.user_id == user_id,
         Meal.logged_at >= start,
-        Meal.logged_at <= end
+        Meal.logged_at < end
     ).all()
 
     if not meals:

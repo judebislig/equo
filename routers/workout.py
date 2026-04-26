@@ -64,7 +64,7 @@ def get_todays_workouts(user_id: int, db: Session = Depends(get_db)):
     workouts = db.query(Workout).filter(
         Workout.user_id == user_id,
         Workout.logged_at >= start,
-        Workout.logged_at <= end
+        Workout.logged_at < end
     ).all()
 
     if not workouts:
