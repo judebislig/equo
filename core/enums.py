@@ -46,6 +46,18 @@ ACTIVITY_MET_MAP = {
     "pickleball": 5.0
 }
 
+# ActivityType enum is auto-generated from ACTIVITY_MET_MAP keys
+# Adding a new activity only requires adding it to ACTIVITY_MET_MAP above
+ActivityType = Enum(
+    "ActivityType",
+    {name.upper().replace(" ", "_"): name for name in ACTIVITY_MET_MAP.keys()},
+    type=str
+)
+
+# ==========================================
+# 2. VALIDATION
+# ==========================================
+
 class GoalType(str, Enum):
     maintain = "maintain"
     cut = "cut"
