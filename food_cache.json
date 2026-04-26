@@ -43,5 +43,32 @@
     "fat": 2.3,
     "is_estimated": true,
     "display_name": "Cheese"
+  },
+  "burger bun|2slices": {
+    "food_name": "BURGER KING, Hamburger",
+    "calories": 156.6,
+    "protein": 8.88,
+    "carbs": 16.08,
+    "fat": 6.36,
+    "is_estimated": false,
+    "display_name": "Burger bun"
+  },
+  "french fries|1cup": {
+    "food_name": "DENNY'S, french fries",
+    "calories": 676.8,
+    "protein": 8.18,
+    "carbs": 84.48,
+    "fat": 33.84,
+    "is_estimated": false,
+    "display_name": "French fries"
+  },
+  "cheese|2slices": {
+    "food_name": "cheese",
+    "calories": 226,
+    "protein": 14.0,
+    "carbs": 1.0,
+    "fat": 18.0,
+    "is_estimated": true,
+    "display_name": "Cheese"
   }
 }
