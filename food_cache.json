@@ -16,5 +16,32 @@
     "fat": 18,
     "is_estimated": true,
     "display_name": "Cheddar cheese"
+  },
+  "ham|100g": {
+    "food_name": "Ham, minced",
+    "calories": 263.0,
+    "protein": 16.3,
+    "carbs": 1.8,
+    "fat": 20.7,
+    "is_estimated": false,
+    "display_name": "Ham"
+  },
+  "bread|2slices": {
+    "food_name": "Bread, egg",
+    "calories": 172.2,
+    "protein": 5.7,
+    "carbs": 28.68,
+    "fat": 3.6,
+    "is_estimated": false,
+    "display_name": "Bread"
+  },
+  "cheese|1tbsp": {
+    "food_name": "cheese",
+    "calories": 28,
+    "protein": 1.8,
+    "carbs": 0.1,
+    "fat": 2.3,
+    "is_estimated": true,
+    "display_name": "Cheese"
   }
 }
