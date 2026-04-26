@@ -55,7 +55,8 @@ def get_daily_summary(user_id: int, db: Session = Depends(get_db)):
     return DailySummaryResponse(
         user_id=user_id,
         date=today,
-        calorie_target=db.calorie_target,
+        calorie_target=db_user.calorie_target,
+        goal=db_user.goal,
         calories_eaten=round(meal_totals.calories, 1),
         protein_eaten=round(meal_totals.protein, 1),
         carbs_eaten=round(meal_totals.carbs, 1),
