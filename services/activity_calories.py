@@ -14,6 +14,46 @@ from core.enums import ACTIVITY_MET_MAP
 # 2. VALIDATION
 # ==========================================
 
+# Physiological bounds for calorie burn rate
+CALORIE_RATE_BOUNDS = {
+    "min_per_minute": 1.5, # Too suspiciously low for any real exercise
+    "max_per_minute": 20.0 # Above this is impossible
+}
+
+def validate_calorie_result(
+    activity_type: str,
+    duration_minutes: int,
+    calories: float,
+    weight_kg: float
+) -> bool:
+    """
+    Validates that calorie burn result is physiologically reasonable.
+    Returns True if result passes all sanity checks.
+    """
+
+    if duration_minutes <= 0:
+        print(f"Invalid duration for {activity_type}: {duration_minutes} minutes")
+        return False
+
+    cal_per_minute = calories / duration_minutes
+
+    # Check mininum - even walking burns more than 1.5 cal/min
+    if cal_per_minute < CALORIE_RATE_BOUNDS["min_per_minute"]:
+        print(f"Too low burn for {activity_type}: {cal_per_minute:.1f} cal/min")
+
+    # Check max 
+    if cal_per_minute > CALORIE_RATE_BOUNDS["max_per_minute"]:
+        print(f"Too low burn for {activity_type}: {cal_per_minute:.1f} cal/min")
+
+    # Weight sanity check
+    if weight_kg < 30 or weight_kg > 300:
+        print(f"Weight out of reasonable range: {weight_kg}kg")
+        return False
+
+    return True
+
+    
+
 def calculate_calories_burned(
     activity_type: str,
     duration_minutes: int,
@@ -32,6 +72,11 @@ def calculate_calories_burned(
     met = ACTIVITY_MET_MAP.get(activity_type.lower(), 5.0) # Default MET to 5
     duration_hours = duration_minutes / 60
     calories = met * weight_kg * duration_hours
+
+    # validate result is physiologically reasonable
+    if not validate_calorie_result(activity_type, duration_minutes, calories, weight_kg):
+        print(f"Validation failed for {activity_type} - using conservative default MET of 4.0")
+        calories = 4.0 * weight_kg * duration_hours
 
     return round(calories, 1), True
     
