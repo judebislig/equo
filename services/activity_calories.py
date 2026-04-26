@@ -4,8 +4,6 @@
 # No LLM involved — pure math
 # Called by routers/workouts.py when a workout is logged
 
-from core.enums import ActivityType
-
 # ==========================================
 # 1. MET DATABASE
 # ==========================================
@@ -20,4 +18,4 @@ def calculate_calories_burned(
     weight_kg: float,
     calories_override: float = None
 ) -> tuple[float, bool]:
-    return [0, False]
+    return [0, True]
