@@ -49,3 +49,25 @@ def log_workout(workout: WorkoutCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_workout)
     return db_workout
+
+@router.get("/{user_id}/today", response_model=list[WorkoutResponse])
+def get_todays_workouts(user_id: int, db: Session = Depends(get_db)):
+    """
+    Get all workouts logged by a user today.
+    """
+    # Will use UTC for consistency. Implementing user timezones later.
+    today = datetime.utcnow().date()
+
+    start = datetime.combine(today, datetime.min.time())
+    end = start + timedelta(days=1)
+
+    workouts = db.query(Workout).filter(
+        Workout.user_id == user_id,
+        Workout.logged_at >= start,
+        Workout.logged_at <= end
+    ).all()
+
+    if not workouts:
+        raise HTTPException(status_code=404, detail=f"No workouts found for user {user_id} today")
+
+    return workouts
