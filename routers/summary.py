@@ -38,25 +38,20 @@ def get_daily_summary(user_id: int, db: Session = Depends(get_db)):
         func.coalesce(func.sum(Meal.protein), 0).label("protein"),
         func.coalesce(func.sum(Meal.carbs), 0).label("carbs"),
         func.coalesce(func.sum(Meal.fat), 0).label("fat")
-    ).filter(
-        Meal.user_id == user_id,
-        Meal.logged_at >= start,
-        Meal.logged_at <= end
-    ).first()
+    ).filter(Meal.user_id == user_id, Meal.logged_at >= start, Meal.logged_at < end).first()
 
     workout_totals = db.query(
         func.coalesce(func.sum(Workout.calories_burned), 0).label("calories_burned")
-    ).filter(
-        Workout.user_id == user_id,
-        Workout.logged_at >= start,
-        Workout.logged_at < end
-    ).first()
+    ).filter(Workout.user_id == user_id, Workout.logged_at >= start, Workout.logged_at < end).first()
 
     return DailySummaryResponse(
         user_id=user_id,
         date=today,
-        calorie_target=db_user.calorie_target,
         goal=db_user.goal,
+        weight_kg=db_user.weight,
+        height_cm=db_user.height,
+        age=db_user.age,
+        sex=db_user.sex,
         calories_eaten=round(meal_totals.calories, 1),
         protein_eaten=round(meal_totals.protein, 1),
         carbs_eaten=round(meal_totals.carbs, 1),

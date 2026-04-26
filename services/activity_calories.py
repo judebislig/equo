@@ -1,17 +1,13 @@
-# services/calories.py
+# services/activity_calories.py
 # Deterministic calorie burn calculation using MET formula
 # Formula: calories = MET x weight_kg x (duration_minutes / 60)
 # No LLM involved — pure math
 # Called by routers/workouts.py when a workout is logged
 
-from core.enums import ACTIVITY_MET_MAP
+from core.enums import ACTIVITY_MET_MAP, CUT_OFFSET, BULK_OFFSET
 
 # ==========================================
-# 1. MET DATABASE
-# ==========================================
-
-# ==========================================
-# 2. VALIDATION
+# VALIDATION
 # ==========================================
 
 # Physiological bounds for calorie burn rate
@@ -52,8 +48,6 @@ def validate_calorie_result(
 
     return True
 
-    
-
 def calculate_calories_burned(
     activity_type: str,
     duration_minutes: int,
@@ -64,7 +58,6 @@ def calculate_calories_burned(
     Calculate calories burned for a workout.
     Returns (calories_burned, is_estimated) where is_estimated is false when override is used and true when MET formula is used
     """
-
     if calories_override is not None and calories_override > 0:
         return round(calories_override, 1), False
     
@@ -80,3 +73,36 @@ def calculate_calories_burned(
 
     return round(calories, 1), True
     
+def calculate_base_tdee(
+    weight_kg: float,
+    height_cm: float,
+    age: int,
+    sex: str
+) -> float:
+    """
+    Calculates the 'Floor' calories (BMR * 1.2),
+    Mifflin-St Jeor Equation
+    """
+    if sex.lower() == "male":
+        bmr = (10 * weight_kg) + (6.25 * height_cm) - (5 * age) + 5
+    else:
+        bmr = (10 * weight_kg) + (6.25 * height_cm) - (5 * age) - 161
+    return round(bmr * 1.2, 1)
+
+def get_initial_calorie_target(
+    weight_kg: float,
+    height_cm: float,
+    age: int,
+    sex: str,
+    goal: str
+) -> float:
+    """
+    Calculates the starting calorie target based on goal offsets.
+    """
+    base = calculate_base_tdee(weight_kg, height_cm, age, sex)
+
+    if goal.lower() == "cut":
+        return base - CUT_OFFSET
+    elif goal.lower() == "bulk":
+        return base + BULK_OFFSET
+    return base

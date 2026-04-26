@@ -14,6 +14,7 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     name: Mapped[str] = mapped_column()
     age: Mapped[int] = mapped_column()
+    sex: Mapped[str] = mapped_column()  # male, female
     weight: Mapped[Optional[float]] = mapped_column(nullable=True)
     height: Mapped[Optional[float]] = mapped_column(nullable=True)
     goal: Mapped[GoalType] = mapped_column()  # bulk, cut, maintain. Maintain is default for now

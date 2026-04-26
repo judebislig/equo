@@ -69,3 +69,10 @@ class MealType(str, Enum):
     dinner = "dinner"
     snack = "snack"
 
+class SexType(str, Enum):
+    male = "male"
+    female = "female"
+
+# Define standard offsets as constants
+CUT_OFFSET= 500
+BULK_OFFSET = 300    
