@@ -56,17 +56,19 @@ class DailySummaryResponse(BaseModel):
         elif self.goal.lower() == "bulk":
             return round(self.current_tdee + BULK_OFFSET, 1)
         return self.current_tdee
-
+    
     @computed_field
     @property
-    def calories_vs_target(self) -> float:
-        """
-        The gap between current intake and the goal target.
-        Positive = Under target (Eat more)
-        Negative = Over target (Exceeded goal)
-        """
+    def calories_vs_maintenance(self) -> float:
+        """How far above or below maintenance — determines actual weight direction"""
+        return round(self.calories_eaten - self.current_tdee, 1)
+
+    @computed_field  
+    @property
+    def calories_remaining(self) -> float:
+        """How far above or below goal target — determines if on track with plan"""
         return round(self.calorie_target - self.calories_eaten, 1)
-    
+
     @computed_field
     @property
     def weekly_forecast_kg(self) -> float:
@@ -76,7 +78,7 @@ class DailySummaryResponse(BaseModel):
     @computed_field
     @property
     def goal_status(self) -> str:
-        diff = self.calories_vs_target
+        diff = self.calories_remaining
         vs_tdee = self.calories_eaten - self.current_tdee
         goal = self.goal.lower()
 
