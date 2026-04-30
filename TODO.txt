@@ -1,2 +1,4 @@
 - Weight target for users, can change the offset needed for cut or bulk
 - LLM to determine what to eat the rest of the day
+- Show service sizes or make it clear that when users don't specify a serving size, it defaults to 100g sizes.
+- React frontend

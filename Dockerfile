@@ -1,5 +1,5 @@
 # Dockerfile
-# Builds the Equo FastAPI application into a container
+# Builds the Equo FastAPI application into an image
 
 FROM python:3.12-slim
 
