@@ -3,6 +3,7 @@
 # Responsible for startup tasks and wiring together all routers
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from database import engine, Base
 from dotenv import load_dotenv
 from routers import user, meal, workout, summary
@@ -19,6 +20,14 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Equo")
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 @app.get("/")
 def root():
     return {"Message": "Equo API is running"}
@@ -27,4 +36,3 @@ app.include_router(user.router, prefix="/users", tags=["users"])
 app.include_router(meal.router, prefix="/meals", tags=["meals"])
 app.include_router(workout.router, prefix="/workouts", tags=["workouts"])
 app.include_router(summary.router, prefix="/summary", tags=["summary"])
-    
