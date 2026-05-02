@@ -67,9 +67,6 @@ def get_todays_workouts(user_id: int, db: Session = Depends(get_db)):
         Workout.logged_at < end
     ).all()
 
-    if not workouts:
-        raise HTTPException(status_code=404, detail=f"No workouts found for user {user_id} today")
-
     return workouts
 
 @router.get("/{user_id}/history", response_model=list[WorkoutResponse])
@@ -81,9 +78,6 @@ def get_workout_history(user_id: int, db: Session = Depends(get_db)):
     workouts = db.query(Workout).filter(
         Workout.user_id == user_id
     ).order_by(Workout.logged_at.desc()).all()
-
-    if not workouts:
-        raise HTTPException(status_code=404, detail=f"No workouts found for user {user_id}")
 
     return workouts
 

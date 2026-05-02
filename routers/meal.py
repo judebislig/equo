@@ -69,9 +69,6 @@ def get_todays_meals(user_id: int, db: Session = Depends(get_db)):
         Meal.logged_at < end
     ).all()
 
-    if not meals:
-        raise HTTPException(status_code=404, detail=f"No meals found for user {user_id} today")
-
     return meals
 
 @router.get("/{user_id}/history", response_model=list[MealResponse])
@@ -83,9 +80,6 @@ def get_meal_history(user_id: int, db: Session = Depends(get_db)):
     meals = db.query(Meal).filter(
         Meal.user_id == user_id
     ).order_by(Meal.logged_at.desc()).all()
-
-    if not meals:
-        raise HTTPException(status_code=404, detail=f"No meals found for user {user_id}")
 
     return meals
 
