@@ -29,14 +29,14 @@ export default function Dashboard() {
 
             {/* header */}
             <div className="flex justify-between items-center">
-                <h1 className="text-2x1 font-bold">Equo</h1>
+                <h1 className="text-2xl font-bold">Equo</h1>
                 <span className="text-gray-500 text-sm">
                     {new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric"})}
                 </span>
             </div>
 
             {/* calorie summary */}
-            <div className="bg-white rounded-x1 shadow p-5 space-y-3">
+            <div className="bg-white rounded-xl shadow p-5 space-y-3">
                 <div className="flex justify-between">
                     <span className="font-semibold">Calories Remaining</span>
                     <span className="text-2xl font-bold">{summary.calories_remaining}</span>
@@ -55,7 +55,7 @@ export default function Dashboard() {
             </div>
 
             {/* macros */}
-            <div className="bg-white rounded-x1 shadow p-5 space-y-3">
+            <div className="bg-white rounded-xl shadow p-5 space-y-3">
                 <h2 className="font-semibold">Macros</h2>
                 {[
                     { label: "Protein", eaten: summary.protein_eaten, target: 180, color: "bg-blue-500" },
@@ -79,12 +79,12 @@ export default function Dashboard() {
 
             {/* stats */}
             <div className="grid grid-cols-2 gap-4">
-                <div className="bg-white rounded-x1 shadow p-4 text-center">
+                <div className="bg-white rounded-xl shadow p-4 text-center">
                     <p className="text-gray-500 text-sm">Burned Today</p>
-                    <p className="text-x1 font-bold">{summary.calories_burned}</p>
+                    <p className="text-xl font-bold">{summary.calories_burned}</p>
                     <p className="text-gray-400 text-xs">cal</p>
                 </div>
-                <div className="bg-white rounded-x1 shadow p-4 text-center">
+                <div className="bg-white rounded-xl shadow p-4 text-center">
                     <p className="text-gray-500 text-sm">Weekly Forecast</p>
                     <p className="text-xl font-bold">{summary.weekly_forecast_kg > 0 ? "+" : ""}{summary.weekly_forecast_kg}</p>
                     <p className="text-gray-400 text-xs">kg</p>
@@ -106,6 +106,33 @@ export default function Dashboard() {
                         </div>
                     ))
                 }
+            </div>
+
+            {/* workouts */}
+            <div className="bg-white rounded-xl shadow p-5">
+                <h2 className="font-semibold mb-3">Today's Workouts</h2>
+                {workouts.length === 0
+                    ? <p className="text-gray-400 text-sm">No workouts logged yet</p>
+                    : workouts.map(workout => (
+                        <div key={workout.id} className="flex justify-between py-2 border-b last:border-0">
+                            <div>
+                                <p className="text-sm font-medium capitalize">{workout.activity_type}</p>
+                                <p className="text-xs text-gray-500">{workout.duration_minutes} min</p>
+                            </div>
+                            <span className="text-sm font-semibold">{workout.calories_burned} cal</span>
+                        </div>
+                    ))
+                }
+            </div>
+
+            {/* nav buttons */}
+            <div className="grid grid-cols-2 gap-4">
+                <a href="/log-meal" className="bg-green-500 text-white text-center py-3 rounded-xl font-semibold">
+                    Log Meal
+                </a>
+                <a href="log-workout" className="bg-blue-500 text-white text-center py-3 rounded-xl font-semibold">
+                    Log Workout
+                </a>
             </div>
 
         </div>
