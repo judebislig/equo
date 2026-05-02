@@ -12,8 +12,12 @@ export default function Dashboard() {
     // Fetches data once in the component when the page loads
     useEffect(() => {
         getToday(USER_ID).then(setSummary)
-        getTodaysMeals(USER_ID).then(setMeals).catch(() => setMeals([]))
-        getTodaysWorkouts(USER_ID).then(setWorkouts).catch(() => setWorkouts([]))
+        getTodaysMeals(USER_ID)
+            .then(data => setMeals(Array.isArray(data) ? data : [])) // ensure array
+            .catch(() => setMeals([]))
+        getTodaysWorkouts(USER_ID)
+        .then(data => setWorkouts(Array.isArray(data) ? data : []))
+        .catch(() => setWorkouts([]))
     }, [])
 
     if (!summary) return <div className="p-8 text-gray-500">Loading...</div>
