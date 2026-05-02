@@ -20,7 +20,7 @@ export const logMeal = async (userId, mealType, description) => {
     return res.json()
 }
 
-export const logWorkout = async (userId, activityType, durationMinutes, caloriesOverride) => {
+export const logWorkout = async (userId, activityType, durationMinutes, caloriesOverride, notes) => {
     const res = await fetch(`${BASE_URL}/workouts/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -28,7 +28,8 @@ export const logWorkout = async (userId, activityType, durationMinutes, calories
             user_id: userId,
             activity_type: activityType,
             duration_minutes: durationMinutes,
-            calories_override: caloriesOverride || null
+            calories_override: caloriesOverride || null,
+            notes: notes || null
         })
     })
     return res.json()
