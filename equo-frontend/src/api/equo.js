@@ -7,7 +7,10 @@ export const getToday = async (userId) => {
 }
 
 export const parseMeal = async (description) => {
-    const res = await fetch(`${BASE_URL}/meals/parse?description=${encodeURIComponent(description)}`)
+    const res = await fetch(`${BASE_URL}/meals/parse?description=${encodeURIComponent(description)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+    })
     return res.json()
 }
 
