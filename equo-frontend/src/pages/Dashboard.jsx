@@ -8,6 +8,7 @@ export default function Dashboard() {
     const [summary, setSummary] = useState(null)
     const [meals, setMeals] = useState([])
     const [workouts, setWorkouts] = useState([])
+    const [isMetric, setIsMetric] = useState(false)
     
     // Fetches data once in the component when the page loads
     useEffect(() => {
@@ -21,6 +22,17 @@ export default function Dashboard() {
     }, [])
 
     if (!summary) return <div className="p-8 text-gray-500">Loading...</div>
+
+    const toDisplayWeight = (kg) => {
+        if (isMetric) return `${kg} kg`
+        return `${(kg * 2.205).toFixed(1)} lbs`
+    }
+
+    const toDisplayForecast = (kg) => {
+        if (isMetric) return `${kg > 0 ? "+" : ""}${kg} kg`
+        const lbs = (kg * 2.205).toFixed(2)
+        return `${kg > 0 ? "+" : ""}${lbs} lbs`
+    }
 
     const caloriePercent = Math.min((summary.calories_eaten / summary.calorie_target) * 100, 100)
     
@@ -37,6 +49,12 @@ export default function Dashboard() {
                 <span className="text-gray-500 text-sm">
                     {new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric"})}
                 </span>
+                <button
+                    onClick={() => setIsMetric(!isMetric)}
+                    className="text-xs bg-gray-100 px-3 py-1 rounded-full font-medium text-gray-600"
+                >
+                    {isMetric ? "kg" : "lbs"}
+                </button>
             </div>
 
             {/* calorie summary */}
@@ -90,8 +108,9 @@ export default function Dashboard() {
                 </div>
                 <div className="bg-white rounded-xl shadow p-4 text-center">
                     <p className="text-gray-500 text-sm">Weekly Forecast</p>
-                    <p className="text-xl font-bold">{summary.weekly_forecast_kg > 0 ? "+" : ""}{summary.weekly_forecast_kg}</p>
-                    <p className="text-gray-400 text-xs">kg</p>
+                    <p className="text-xl font-bold">
+                        {toDisplayForecast(summary.weekly_forecast_kg)}
+                    </p>
                 </div>
             </div>
 
