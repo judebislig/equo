@@ -8,7 +8,7 @@ export default function Dashboard() {
     const [summary, setSummary] = useState(null)
     const [meals, setMeals] = useState([])
     const [workouts, setWorkouts] = useState([])
-
+    
     // Fetches data once in the component when the page loads
     useEffect(() => {
         getToday(USER_ID).then(setSummary)
@@ -23,6 +23,10 @@ export default function Dashboard() {
     if (!summary) return <div className="p-8 text-gray-500">Loading...</div>
 
     const caloriePercent = Math.min((summary.calories_eaten / summary.calorie_target) * 100, 100)
+    
+    const proteinTarget = Math.round((summary.calorie_target * 0.30) / 4)
+    const carbTarget = Math.round((summary.calorie_target * 0.40) / 4)
+    const fatTarget = Math.round((summary.calorie_target * 0.30) / 9)
 
     return (
         <div className="max-w-lg mx-auto p-6 space-y-6">
@@ -58,9 +62,9 @@ export default function Dashboard() {
             <div className="bg-white rounded-xl shadow p-5 space-y-3">
                 <h2 className="font-semibold">Macros</h2>
                 {[
-                    { label: "Protein", eaten: summary.protein_eaten, target: 180, color: "bg-blue-500" },
-                    { label: "Carbs", eaten: summary.carbs_eaten, target: 200, color: "bg-yellow-400" },
-                    { label: "Fat", eaten: summary.fat_eaten, target: 80, color: "bg-red-400"},
+                    { label: "Protein", eaten: summary.protein_eaten, target: proteinTarget, color: "bg-blue-500" },
+                    { label: "Carbs", eaten: summary.carbs_eaten, target: carbTarget, color: "bg-yellow-400" },
+                    { label: "Fat", eaten: summary.fat_eaten, target: fatTarget, color: "bg-red-400"},
                 ].map(({ label, eaten, target, color }) => (
                     <div key={label} className="space-y-1">
                         <div className="flex justify-between text-sm">
