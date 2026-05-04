@@ -23,11 +23,6 @@ export default function Dashboard() {
 
     if (!summary) return <div className="p-8 text-gray-500">Loading...</div>
 
-    const toDisplayWeight = (kg) => {
-        if (isMetric) return `${kg} kg`
-        return `${(kg * 2.205).toFixed(1)} lbs`
-    }
-
     const toDisplayForecast = (kg) => {
         if (isMetric) return `${kg > 0 ? "+" : ""}${kg} kg`
         const lbs = (kg * 2.205).toFixed(2)

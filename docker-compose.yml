@@ -7,3 +7,12 @@ services:
     env_file:
       - .env
     restart: always
+
+  frontend:
+    container_name: equo-frontend
+    build:
+      context: ./equo-frontend
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    restart: always
