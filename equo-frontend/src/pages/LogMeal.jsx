@@ -14,6 +14,7 @@ export default function LogMeal() {
     const [logging, setLogging] = useState(false)
 
     const handleParse = async() => {
+        if (loading) return
         setLoading(true)
         const result = await parseMeal(description)
         setPreview(result)
@@ -21,6 +22,7 @@ export default function LogMeal() {
     }
 
     const handleLog = async () => {
+        if (logging) return
         setLogging(true)
         await logMeal(USER_ID, mealType, description)
         setLogging(false)

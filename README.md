@@ -16,17 +16,26 @@ A health tracking API that lets users log meals in natural language and receive 
 
 ## Live Demo
 API: http://18.224.179.88:8000/docs
+Frontend: http://18.224.179.88
 
 ## Architecture
 
-User -> FASTAPI (AWS EC2) -> PostgreSQL (Supabase)
-        -> stored food cache
-        -> Gemini Flash (NLP extraction)
-        -> USDA FoodData Central (nutrition lookup)
-        -> LLM fallback (unmatched foods)
+User → React Frontend (AWS EC2 / Nginx)
+     → FastAPI Backend (AWS EC2) → PostgreSQL (Supabase)
+                ↓
+        Gemini Flash (NLP extraction)
+                ↓
+        USDA FoodData Central (nutrition lookup)
+                ↓
+        LLM fallback (unmatched foods)
 
 ## Features
 
+- React frontend with dashboard, meal logging, and workout logging pages
+- Natural language meal input with parse preview before committing
+- Real-time calorie balance updates after logging or deleting entries
+- Metric and imperial toggle for weekly weight forecast
+- Mobile responsive layout
 - Natural language meal logging - type "chicken rice and broccoli" and get back structured macros
 - Multi-stage food parsing pipeline with relevance scoring, Atwater calorie validation / other validation, LLM fallback
 - Dynamic TDEE calculation using Mifflin-St Jeor equation with real workout calories layered on top
@@ -39,14 +48,15 @@ User -> FASTAPI (AWS EC2) -> PostgreSQL (Supabase)
 
 ## Tech Stack
 
-|       Layer       |       Technology      |
-|-------------------|-----------------------|
-| Backend           | Python, FastAPI       |
-| Database          | PostgreSQL (Supabase) |
-| NLP Extraction    | Gemini Flash          |
-| Nutrition Data    | USDA FoodData Central |
-| Containerization  | Docker                |
-| Hosting           | AWS EC2               |
+|       Layer       |       Technology          |
+|-------------------|---------------------------|
+| Frontend          | React, Vite, Tailwind CSS |
+| Backend           | Python, FastAPI           |
+| Database          | PostgreSQL (Supabase)     |
+| NLP Extraction    | Gemini Flash              |
+| Nutrition Data    | USDA FoodData Central     |
+| Containerization  | Docker                    |
+| Hosting           | AWS EC2                   |
 
 ## How the Food Parsing Pipeline Works
 
@@ -94,6 +104,8 @@ User -> FASTAPI (AWS EC2) -> PostgreSQL (Supabase)
 
 **Prerequisites:** Python 3.12+, Docker
 
+### Backend
+
 1. Clone the repo
 ```bash
    git clone https://github.com/judebislig/equo.git
@@ -111,6 +123,33 @@ User -> FASTAPI (AWS EC2) -> PostgreSQL (Supabase)
 ```
 
 4. Visit http://localhost:8000/docs
+
+### Frontend
+1. Navigate to frontend folder
+```bash
+   cd equo-frontend
+```
+
+2. Install dependencies
+```bash
+   npm install
+```
+
+3. Update BASE_URL in src/api/equo.js to point to your backend
+
+4. Start dev server
+```bash
+   npm run dev
+```
+
+5. Visit http://localhost:5173
+
+### Full stack with Docker
+```bash
+docker compose up --build -d
+```
+Runs both frontend and backend together.
+Visit http://localhost for frontend, http://localhost:8000/docs for API.
 
 ## Environment Variables
 
