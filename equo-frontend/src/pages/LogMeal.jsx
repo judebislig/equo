@@ -11,6 +11,7 @@ export default function LogMeal() {
     const [preview, setPreview] = useState(null)
     const [loading, setLoading] = useState(false)
     const [logged, setLogged] = useState(false)
+    const [logging, setLogging] = useState(false)
 
     const handleParse = async() => {
         setLoading(true)
@@ -20,7 +21,9 @@ export default function LogMeal() {
     }
 
     const handleLog = async() => {
+        setLogging(true)
         await logMeal(USER_ID, mealType, description)
+        setLogging(false)
         setLogged(true)
     }
 
@@ -102,9 +105,10 @@ export default function LogMeal() {
                     )}
                     <button
                         onClick={handleLog}
-                        className="w-full bg-green-500 text-white py-3 rounded-xl font-semibold mt-2"
+                        disabled={logging}
+                        className="w-full bg-green-500 text-white py-3 rounded-xl font-semibold disabled:opacity-40 mt-2"
                     >
-                        Log Meal
+                        {logging ? "Logging..." : "Log Meal"}
                     </button>
                 </div>
             )}

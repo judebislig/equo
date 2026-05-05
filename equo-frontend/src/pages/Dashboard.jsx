@@ -118,7 +118,7 @@ export default function Dashboard() {
                         <div key={meal.id} className="flex justify-between py-2 border-b last:border-0">
                             <div>
                                 <p className="text-sm font-medium capitalize">{meal.meal_type}</p>
-                                <p className="text-xs text-gray-500">{meal.food_name}</p>
+                                <p className="text-xs text-gray-500">{meal.description}</p>
                             </div>
                             <span className="text-sm font-semibold">{meal.calories} cal</span>
                         </div>
