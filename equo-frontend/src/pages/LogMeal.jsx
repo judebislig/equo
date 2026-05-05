@@ -20,7 +20,7 @@ export default function LogMeal() {
         setLoading(false)
     }
 
-    const handleLog = async() => {
+    const handleLog = async () => {
         setLogging(true)
         await logMeal(USER_ID, mealType, description)
         setLogging(false)
