@@ -16,17 +16,33 @@ export default function LogMeal() {
     const handleParse = async() => {
         if (loading) return
         setLoading(true)
-        const result = await parseMeal(description)
-        setPreview(result)
-        setLoading(false)
+        try {
+            const result = await parseMeal(description)
+            setPreview(result)
+        }
+        catch (err) {
+            console.error(err)
+            alert("Failed to parse meal")
+        }
+        finally {
+            setLoading(false)
+        }
     }
 
     const handleLog = async () => {
         if (logging) return
         setLogging(true)
-        await logMeal(USER_ID, mealType, description)
-        setLogging(false)
-        setLogged(true)
+        try {
+            await logMeal(USER_ID, mealType, description)
+            setLogged(true)
+        }
+        catch (err) {
+            console.error(err)
+            alert("Failed to log meal")
+        }
+        finally {
+            setLogging(false)
+        }
     }
 
     if (logged) return (

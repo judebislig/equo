@@ -4,6 +4,7 @@
 # Caching can be added later as an optimization
 
 import re
+import time
 import httpx
 import json
 import os
@@ -93,6 +94,20 @@ def mock_llm_fallback(food_name: str, amount: str) -> dict:
         "is_estimated": True
     }
 
+def retry(func, attempts=3, delay=1):
+    last_error = None
+
+    for attempt in range(attempts):
+        try:
+            return func()
+        except Exception as e:
+            last_error = e
+
+            if attempt < attempts - 1:
+                time.sleep(delay * (2 ** attempt))
+
+    raise last_error
+
 # ==========================================
 # 2. DATA MAPPERS
 # ==========================================
@@ -147,7 +162,12 @@ def nlp_extract_ingredients(description: str) -> list[dict]:
         return mock_extract_ingredients(description)
 
     prompt = EXTRACT_FOOD_ITEMS_PROMPT.format(description=description)
-    response = client.models.generate_content(model=MODEL,contents=prompt)
+    response = retry(
+        lambda: client.models.generate_content(
+            model=MODEL,
+            contents=prompt
+        )
+    )
     items = parse_json_from_text(response.text).get("items", [])
 
     if isinstance(items, dict):
@@ -169,7 +189,12 @@ def estimate_nutrition_batch(items: list[dict]) -> list[dict]:
     # We send the entire batch of items in one prompt to Gemini, which should be more efficient than multiple calls
     items_json = json.dumps(items)
     prompt = LLM_FALLBACK_PROMPT.format(count=len(items), items_json=items_json)
-    response = client.models.generate_content(model=MODEL, contents=prompt)
+    response = retry(
+        lambda: client.models.generate_content(
+            model=MODEL,
+            contents=prompt
+        )
+    )
 
     # Extract JSON array of nutrition estimates from the response
     results = parse_json_from_text(response.text)
@@ -238,7 +263,13 @@ def call_usda_api(food_name: str, amount_str: str) -> dict | None:
         "dataType": "Foundation,SR Legacy"
     }
     try:
-        response = httpx.get(url, params=params)
+        response = retry(
+            lambda: httpx.get(
+                url,
+                params=params,
+                timeout=5.0
+            )
+        )
         results = response.json().get("foods", [])
         
         if not results:
