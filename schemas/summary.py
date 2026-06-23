@@ -28,7 +28,7 @@ class DailySummaryResponse(BaseModel):
     # Computed fields - calculated from the above
     @computed_field
     @property
-    def base_tdee(self) -> float:
+    def bee(self) -> float:
         """
         Mifflin-St Jeor BMR * Sedentary Factor (1.2)
         We intentionally use sedentary as the base because actual exercise calories 
@@ -44,7 +44,7 @@ class DailySummaryResponse(BaseModel):
     @property
     def current_tdee(self) -> float:
         # Dynamic TDEE: Baseline + specific exercise
-        return round(self.base_tdee + self.calories_burned, 1)
+        return round(self.bee + self.calories_burned, 1)
 
     @computed_field
     @property

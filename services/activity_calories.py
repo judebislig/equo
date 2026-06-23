@@ -73,7 +73,7 @@ def calculate_calories_burned(
 
     return round(calories, 1), True
     
-def calculate_base_tdee(
+def calculate_bee(
     weight_kg: float,
     height_cm: float,
     age: int,
@@ -99,7 +99,7 @@ def get_initial_calorie_target(
     """
     Calculates the starting calorie target based on goal offsets.
     """
-    base = calculate_base_tdee(weight_kg, height_cm, age, sex)
+    base = calculate_bee(weight_kg, height_cm, age, sex)
 
     if goal.lower() == "cut":
         return base - CUT_OFFSET
