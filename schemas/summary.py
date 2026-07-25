@@ -42,7 +42,7 @@ class DailySummaryResponse(BaseModel):
 
     @computed_field
     @property
-    def current_tdee(self) -> float:
+    def tdee(self) -> float:
         # Dynamic TDEE: Baseline + specific exercise
         return round(self.bee + self.calories_burned, 1)
 
@@ -52,16 +52,16 @@ class DailySummaryResponse(BaseModel):
         # Target moves based on the dynamic TDEE
         # These offsets are defined in core.enums
         if self.goal.lower() == "cut":
-            return round(self.current_tdee - CUT_OFFSET, 1)
+            return round(self.tdee - CUT_OFFSET, 1)
         elif self.goal.lower() == "bulk":
-            return round(self.current_tdee + BULK_OFFSET, 1)
-        return self.current_tdee
+            return round(self.tdee + BULK_OFFSET, 1)
+        return self.tdee
     
     @computed_field
     @property
     def calories_vs_maintenance(self) -> float:
         """How far above or below maintenance — determines actual weight direction"""
-        return round(self.calories_eaten - self.current_tdee, 1)
+        return round(self.calories_eaten - self.tdee, 1)
 
     @computed_field  
     @property
@@ -72,14 +72,14 @@ class DailySummaryResponse(BaseModel):
     @computed_field
     @property
     def weekly_forecast_kg(self) -> float:
-        net_daily_balance = self.calories_eaten - self.current_tdee
+        net_daily_balance = self.calories_eaten - self.tdee
         return round((net_daily_balance * 7) / 7700, 2)
 
     @computed_field
     @property
     def goal_status(self) -> str:
         diff = self.calories_remaining
-        vs_tdee = self.calories_eaten - self.current_tdee
+        vs_tdee = self.calories_eaten - self.tdee
         goal = self.goal.lower()
 
         if goal == "cut":
