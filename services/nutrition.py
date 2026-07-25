@@ -42,12 +42,9 @@ def save_cache(cache_data):
     except IOError as e:
         print(f"Error saving cache file: {e}")
 
-def generate_cache_key(food_name: str, amount_str: str) -> str:
+def generate_cache_key(food_name: str) -> str:
     """Generate a unique cache key based on food name and amount string"""
     item = food_name.lower().strip()
-    # Remove spaces and special characters between numbers and units for consistency (e.g., "100 g" -> "100g")
-    amount = re.sub(r'(\d+)\s+([a-zA-Z]+)', r'\1\2', amount_str.lower().strip())
-    return f"{item}|{amount}"
 
 def parse_json_from_text(text: str) -> list | dict:
     """
@@ -338,10 +335,24 @@ def parse_meal(description: str) -> dict:
 
     # Step 2: Check cache first for each item before calling USDA
     for item in food_items:
-        key = generate_cache_key(item["item"], item["amount"])
+        key = generate_cache_key(item["item"])
         if key in NUTRITION_CACHE:
             print(f"Cache hit for {key}")
-            final_nutrition_data.append(NUTRITION_CACHE[key])
+            cached = NUTRITION_CACHE[key]
+            multiplier = get_portion_in_grams(item["item"], item["amount"]) / 100.0
+
+            # Scale cached base values by portion
+            scaled = {
+                "food_name": cached["food_name"],
+                "display_name": item["item"].capitalize(),
+                "calories": round(cached["calories_per_100g"] * multiplier, 2),
+                "protein": round(cached["protein_per_100g"] * multiplier, 2),
+                "carbs": round(cached["carbs_per_100g"] * multiplier, 2),
+                "fat": round(cached["fat_per_100g"] * multiplier, 2),
+                "is_estimated": cached["is_estimated"]
+            }
+
+            final_nutrition_data.append(scaled)
         else:
             print(f"Cache miss for {key}, adding to USDA lookup queue")
             items_to_lookup.append(item)
@@ -352,12 +363,17 @@ def parse_meal(description: str) -> dict:
         usda_nutrition = call_usda_api(item["item"], item["amount"])
     
         if usda_nutrition:
-            # Add original name for UI consistency
-            usda_nutrition["display_name"] = item["item"].capitalize()
-            final_nutrition_data.append(usda_nutrition)
-
-            key = generate_cache_key(item["item"], item["amount"])
-            NUTRITION_CACHE[key] = usda_nutrition  # Cache the USDA result for future use
+            # Store per 100g in cache — not scaled
+            cache_entry = {
+                "food_name": best_match["description"],
+                "calories_per_100g": base_macros["calories_per_100g"],
+                "protein_per_100g": base_macros["protein_per_100g"],
+                "carbs_per_100g": base_macros["carbs_per_100g"],
+                "fat_per_100g": base_macros["fat_per_100g"],
+                "is_estimated": False
+            }
+            key = generate_cache_key(item["item"])
+            NUTRITION_CACHE[key] = cache_entry
 
         else:
             # If failed USDA or hit the calorie sanity checks, add to LLM batch list
@@ -371,12 +387,20 @@ def parse_meal(description: str) -> dict:
         for i in range(min(len(batch_results), len(fallback_items_queue))):
             est = batch_results[i]
             original_item = fallback_items_queue[i]
-
-            est["display_name"] = original_item["item"].capitalize()
-            final_nutrition_data.append(est)
-
-            key = generate_cache_key(original_item["item"], original_item["amount"])
-            NUTRITION_CACHE[key] = est  # Cache the LLM estimate for future use
+            
+            # Convert to per 100g before caching
+            multiplier = get_portion_in_grams(original_item["item"], original_item["amount"]) / 100.0
+            
+            cache_entry = {
+                "food_name": est["food_name"],
+                "calories_per_100g": est["calories"] / multiplier if multiplier else est["calories"],
+                "protein_per_100g": est["protein"] / multiplier if multiplier else est["protein"],
+                "carbs_per_100g": est["carbs"] / multiplier if multiplier else est["carbs"],
+                "fat_per_100g": est["fat"] / multiplier if multiplier else est["fat"],
+                "is_estimated": True
+            }
+            key = generate_cache_key(original_item["item"])
+            NUTRITION_CACHE[key] = cache_entry
 
     save_cache(NUTRITION_CACHE)  # Save cache after processing all items
 
